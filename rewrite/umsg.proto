@@ -1,0 +1,84 @@
+syntax = "proto3";
+package vcf;
+
+option java_package = "com.rubicom.vcf";
+option java_outer_classname="UmsgProtos";
+
+//////////////header(should be added before send)////////////////
+///////////// { type, size } ///////////////////////////////
+
+message initial_req_msg //type==0, app->serv only
+{
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    uint32 _version=3;
+    uint32 _cycle=4;
+    int32  _result=5;
+    string _msg=6;
+}
+message initial_prm_msg // type==1, serv->app only
+{
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    string _name=3;
+    uint32 _varID=4;
+    uint32 _varType=5;
+    int32  _value=6;
+    int32  _result=7;
+    uint32 _version=8;
+    string _msg=9; 
+    
+    optional int32  _min=10;
+    optional int32  _max=11;
+}
+message initial_cmd_msg // type==2, serv->app only
+{ 
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    string _name=3;
+    uint32 _varID=4;
+    int32  _value=5;
+    int32  _result=7;
+    uint32 _version=8;
+    string _msg=9;
+}
+
+
+/*
+   message var_msg // type==3
+{
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    uint32 _to=3;
+    uint32 _cmd=4;
+    uint32 _varID=5;
+    int32  _value=6;
+    int32  _result=7;//request=0, response=1
+    uint32 _timestamp=8;
+    string _msg=9;
+}
+message cmd_msg // type==4
+{ 
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    uint32 _to=3;
+    uint32 _varID=4;
+    int32  _value=5;
+    int32  _result=6;//request=0, response=1
+    uint32 _timestamp=7;
+    string _msg=8;
+}
+
+*/
+message operation_msg // type==3
+{ 
+    uint32 _seqNo=1;
+    uint32 _from=2;
+    uint32 _to=3;
+    uint32 _varID=4;
+    int32  _value=5;
+    int32  _result=6;//request=0, response=1
+    string _msg=7;
+}
+
+
