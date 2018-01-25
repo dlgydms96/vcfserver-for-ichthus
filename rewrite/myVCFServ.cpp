@@ -9,57 +9,74 @@
 #include <pthread.h>
 #include <regex.h>
 
+#include "VThread.h"
+#include "global.h"
+
+#include <fstream>
+#include <google/protobuf/util/time_util.h>
+#include "umsg.pb.h"
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
+using namespace std;
+using namespace vcf;
+using namespace google::protobuf::io;
+
 #define SERVER_IPADDR "127.0.0.1"
 #define SERVER_PORTNO 9000
 #define MAX_CLIENTS 2
 #define MAX_BUFFER 1024
 #define MAX_NAME 20
 
+int connect_start=1;
+int nclients = 0;
+
+pthread_t recv_thread_id[MAX_CLIENTS];
+VThread *send_thread[MAX_CLIENTS] = {NULL,NULL};
+VThread *ecat_thread = NULL;
+VThread *obd2_thread = NULL;
 ///////////////////////////////////////////////
 // data structure (mutex not implemented!)
 ///////////////////////////////////////////////
-struct client_struct {
+struct client_struct 
+{
   int id; 
   int sockfd;
   sockaddr_in sockaddr;
-  char name[MAX_NAME];
 } clients[MAX_CLIENTS];
 
-int nclients = 0;
-int client_id = 0;
-
-void init_clients(void) {
-  for (int k = 0; k < MAX_CLIENTS; k++) {
+void init_clients(void) 
+{
+  for (int k = 0; k < MAX_CLIENTS; k++) 
+  {
     clients[k].sockfd = -1;
   }
 }
 
-int find_empty_client(void) {
-  for (int k = 0; k < MAX_CLIENTS; k++) {
+int find_empty_client(void) 
+{
+  for (int k = 0; k < MAX_CLIENTS; k++) 
+  {
     if (clients[k].sockfd < 0) return k;
   }
   return -1;
 }
 
-int find_client_by_id(int id) {
-  for (int k = 0; k < MAX_CLIENTS; k++) {
+int find_client_by_id(int id) 
+{
+  for (int k = 0; k < MAX_CLIENTS; k++) 
+  {
     if (clients[k].sockfd < 0) continue;
     if (clients[k].id == id) return k;
   }
   return -1;
 }
 
-int find_client_by_name(char *name) {
-  for (int k = 0; k < MAX_CLIENTS; k++) {
-    if (clients[k].sockfd < 0) continue;
-    if (!strcmp(clients[k].name, name)) return k;
-  }
-  return -1;
-}
-
-void add_client(int id, int sockfd, sockaddr_in sockaddr) {
+void add_client(int id, int sockfd, sockaddr_in sockaddr) 
+{
   int idx = find_empty_client();
-  if (idx < 0) {
+  if (idx < 0) 
+  {
     printf("error: no empty entries\n");
     exit(1);
   }
@@ -67,31 +84,21 @@ void add_client(int id, int sockfd, sockaddr_in sockaddr) {
   clients[idx].id = id;
   clients[idx].sockfd = sockfd;
   clients[idx].sockaddr = sockaddr;
-  sprintf(clients[idx].name, "anonymous_%d", sockfd);
-  printf("client[%d] added (id=%d,name=%s)\n", idx, id, clients[idx].name);
+  printf("client[%d] added (id=%d)\n", idx, id);
 }
 
-void delete_client(int id) {
+void delete_client(int id) 
+{
   int idx = find_client_by_id(id);
-  if (idx < 0) {
+  if (idx < 0) 
+  {
     printf("error: unknown id\n");
     exit(1);
   }
   clients[idx].sockfd = -1;
-  printf("client[%d] deleted (id=%d,name=%s)\n", idx, id, clients[idx].name);
+  printf("client[%d] deleted (id=%d)\n", idx, id);
 }
 
-void name_client(int id, char *newname) {
-  char oldname[MAX_NAME];
-  int idx = find_client_by_id(id);
-  if (idx < 0) {
-    printf("error: unknown id\n");
-    exit(1);
-  }
-  strcpy(oldname, clients[idx].name);
-  strcpy(clients[idx].name, newname);
-  printf("client[%d] changed its name (%s->%s)\n", idx, oldname, newname);
-}
 
 ///////////////////////////////////////////////
 // system programming 
@@ -137,228 +144,347 @@ int startup_server(char *ipaddr, int portno)
 
   return sockfd;
 }
-void *receive_Thread(void *arg) 
-{
-  char buf[MAX_BUFFER], buffer[MAX_BUFFER];
-  int id= (int) arg;
-  int sockfd, nread, nconsumed, totread = 0;
-  char *cpos, *npos, *rpos;
-  int retval = 1;
-
-  
-  sockfd = clients[find_client_by_id(id)].sockfd;
-  memset(buffer, 0, sizeof(buffer));
-
-  while (1) 
-  {
-    memset(buf, 0, MAX_BUFFER);
-    nread = read(sockfd, buf, sizeof(buf));
-    if (nread < 0) {
-      printf("thread[%d]: error: read(): %s\n", id, strerror(errno));
-      pthread_exit((void *)&retval);
-    }
-    else if (nread == 0) {
-      printf("thread[%d]: socket closed\n", id);
-      pthread_exit((void *)&retval);
-    }
-    // else if (nread > 0)
-    //print_string(buf);
-    //printf("%s", buf);
-
-    if (sizeof(buffer) - strlen(buffer) <= strlen(buf)) {
-      printf("thread[%d]: too small buffer\n", id);
-      pthread_exit((void *)&retval);
-    }
-
-    //strcpy(buffer, "a\nbb\nccc"); totread = 8;
-    strcat(buffer, buf);
-    totread += nread;
-    cpos = buffer;
-    while ((npos = (char *) memchr(cpos, '\n', totread)) != NULL) {
-      *npos = 0; // replace '\n' with NULL
-      if ((rpos = (char *) memchr(cpos, '\r', totread)) != NULL)
-	*rpos = 0; // replace '\r' with NULL
-      printf("thread[%d]: line = %s\n", id, cpos);
-      if (process_msg(id, cpos) != 0) pthread_exit((void *)&retval);
-      nconsumed = npos - cpos + 1;
-      totread -= nconsumed;
-      cpos = npos + 1;
-    }
-    strcpy(buf, cpos);
-    memset(buffer, 0, MAX_BUFFER);
-    strcpy(buffer, buf);
-    if (strlen(buffer) > 0) {
-      printf("thread[%d]: buffer = %s (not completed)\n", id, buffer);
-    }
-  }
-}
 ///////////////////////////////////////////////
 // recv_thread routine for android app
 ///////////////////////////////////////////////
-google::protobuf::uint32 readHdr(char *buf)
+
+void readHdr(google::protobuf::uint32 hdr[], char *buf)
 {
-  google::protobuf::uint32 size;
-  google::protobuf::io::ArrayInputStream ais(buf,4);
-  CodedInputStream coded_input(&ais);
-  coded_input.ReadVarint32(&size);
-  cout<<"HDR: bytecount = " << 4 << endl;
-  cout<<"HDR: content (in int32) = " << size << endl;
-  return size;
+    google::protobuf::io::ArrayInputStream ais(buf,2);
+    CodedInputStream coded_input(&ais);
+    coded_input.ReadVarint32(&hdr[0]);
+    coded_input.ReadVarint32(&hdr[1]);
+    cout<<"HDR: type (in int32) " << hdr[0] << endl;
+    cout<<"HDR: content (in int32) " << hdr[1] << endl;
 }
 
-Umsg *readBody(int sockfd,google::protobuf::uint32 siz)
+
+Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
 {
   int bytecount;
-  Umsg *umsg = new Umsg();
-  char buffer [siz+4];//size of the payload and hdr
+  char buffer[hdr[1]+2];
+  Initial_msg *init_msg;
   //Read the entire buffer including the hdr
   printf("before recv function\n"); 
-  if((bytecount = recv(sockfd, (void *)buffer, 1+siz, MSG_WAITALL))== -1)
-    {
-      fprintf(stderr, "Error receiving data %d\n", errno);
-    }
+  if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
+  {
+    fprintf(stderr, "Error receiving data %d\n", errno);
+  }
   cout<<"BODY: bytecount = " << bytecount << endl;
-  for (int i = 0; i < bytecount; i++) {
+  for (int i = 0; i < bytecount; i++) 
+  {
     printf("_%d", buffer[i]);
   }
   printf("\n");
   //Assign ArrayInputStream with enough memory 
-  google::protobuf::io::ArrayInputStream ais(buffer,siz+4);
+  google::protobuf::io::ArrayInputStream ais(buffer,hdr[1]+2);
   CodedInputStream coded_input(&ais);
   //Read an unsigned integer with Varint encoding, truncating to 32 bits.
-  coded_input.ReadVarint32(&siz);
+  coded_input.Skip(2);
   //After the message's length is read, PushLimit() is used to prevent the CodedInputStream 
   //from reading beyond that length.Limits are used when parsing length-delimited 
   //embedded messages
-  google::protobuf::io::CodedInputStream::Limit msgLimit = coded_input.PushLimit(siz);
+  google::protobuf::io::CodedInputStream::Limit msgLimit = coded_input.PushLimit(hdr[1]);
   //De-Serialize
-  umsg->ParseFromCodedStream(&coded_input);
+  init_msg->ParseFromCodedStream(&coded_input);
   //Once the embedded message has been parsed, PopLimit() is called to undo the limit
   coded_input.PopLimit(msgLimit);
   //Print the message
-  //cout<<"Message is "<<umsg->DebugString()<<endl;
-  cout<<"_seqno : "<<umsg->_seqno()<<endl;
-  cout<<"_from : "<<umsg->_from()<<endl;
-  cout<<"_to : "<<umsg->_to()<<endl;
-  cout<<"_cmd : "<<umsg->_cmd()<<endl;
-  cout<<"_varID : "<<umsg->_varid()<<endl;
-  cout<<"_value : "<<umsg->_value()<<endl;
-  cout<<"_result : "<<umsg->_result()<<endl;
-  cout<<"_timestamp : "<<umsg->_timestamp()<<endl;
-  cout<<"_msg : "<<umsg->_msg()<<endl;
-  return umsg;
+  cout<<"Message is "<<init_msg->DebugString()<<endl;
+  return init_msg;
 }
-
-
-void *recv_main_w_protobuf(void *arg) 
+Operation_msg *operation_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
 {
-  int *sockfd=(int *)arg;
-  char buffer[4];
-  int bytecount=0;
-  string output,pl;
-  Umsg *umsg;
-  int check = 0;
-
-  memset(buffer, '\0', 4);
-  while(1)
-    {
-      if((bytecount= recv(*sockfd, buffer,4,MSG_PEEK))==-1)
-        {
-	  fprintf(stderr, "Error receiving data %d\n",errno);
-        }
-      else if(bytecount==0) break;
-      cout<<"peek bytes = "<< bytecount << endl;
-      umsg = readBody(*sockfd, readHdr(buffer));
-      _recv_process(umsg);
-      switch(umsg->_to()) {
-      case APP :
-	if(umsg->_varid() == 15) {
-	  send_thread[TELNET]->PostMsg((const Umsg *) umsg);
-	} else {
-	  send_thread[APP]->PostMsg((const Umsg *) umsg);
-	}
-	break;
-      case ECAT : ecat_thread->PostMsg((const Umsg *) umsg);
-	break;
-      case OBD2 : obd2_thread->PostMsg((const Umsg *) umsg);
-	break;
-      }
-    }
+  int bytecount;
+  char buffer[hdr[1]+2];
+  Operation_msg *oper_msg;
+  //Read the entire buffer including the hdr
+  printf("before recv function\n"); 
+  if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
+  {
+    fprintf(stderr, "Error receiving data %d\n", errno);
+  }
+  cout<<"BODY: bytecount = " << bytecount << endl;
+  for (int i = 0; i < bytecount; i++) 
+  {
+    printf("_%d", buffer[i]);
+  }
+  printf("\n");
+  //Assign ArrayInputStream with enough memory 
+  google::protobuf::io::ArrayInputStream ais(buffer,hdr[1]+2);
+  CodedInputStream coded_input(&ais);
+  //Read an unsigned integer with Varint encoding, truncating to 32 bits.
+  coded_input.Skip(2);
+  //After the message's length is read, PushLimit() is used to prevent the CodedInputStream 
+  //from reading beyond that length.Limits are used when parsing length-delimited 
+  //embedded messages
+  google::protobuf::io::CodedInputStream::Limit msgLimit = coded_input.PushLimit(hdr[1]);
+  //De-Serialize
+  oper_msg->ParseFromCodedStream(&coded_input);
+  //Once the embedded message has been parsed, PopLimit() is called to undo the limit
+  coded_input.PopLimit(msgLimit);
+  //Print the message
+  cout<<"Message is "<<oper_msg->DebugString()<<endl;
+  return oper_msg;
 }
+
+void *recv_thread(void *arg) 
+{
+  int *client_id=(int *)arg;
+  google::protobuf::uint32 hdr[2];
+  char buffer[2];
+  int bytecount=0;
+ 
+
+  memset(buffer, '\0', 2);
+
+  while(1)
+  {
+      if((bytecount= recv(clients[*client_id].sockfd, buffer,2,MSG_PEEK))==-1)
+      {
+	  fprintf(stderr, "Error receiving data %d\n",errno);
+      }
+      else if(bytecount==0) break;
+     
+      readHdr(hdr, buffer);
+     
+      if(hdr[1]==3) 
+      {
+          Operation_msg *umsg = new Operation_msg;
+          umsg = operation_ReadBody(clients[*client_id].sockfd, hdr);
+          switch(umsg->_to())
+          {
+              case ECAT:
+                    ecat_thread->PostMsg((const UserMsg *) umsg);
+        	    break;
+              case OBD2 : 
+                    obd2_thread->PostMsg((const UserMsg *) umsg);
+                    break;
+          }
+          umsg->set__result(1);
+          send_thread[*client_id]->PostMsg((const UserMsg *) umsg);
+      }
+     
+      else if(hdr[1]>=0 && hdr[1]<3)
+      {
+          Initial_msg *umsg = new Initial_msg;
+          umsg = initial_ReadBody(clients[*client_id].sockfd, hdr);
+          init_thread->PostMsg((const UserMsg *) umsg);
+          
+          umsg->set__result(1);
+          send_thread[*client_id]->PostMsg((const UserMsg *) umsg);
+      }
+     
+      else 
+      {
+          printf("unknown type\n");
+      }
+  }
+}
+/*
+void send_handler(VThread *t, ThreadMsg *msg) 
+{
+  cout << "Ptoro Send" << endl;
+  const Umsg* umsg = static_cast<const Umsg*>(msg->msg);
+  cout<<"size after serilizing is "<<umsg->ByteSize()<<endl;
+  int siz = umsg->ByteSize()+1;
+  char *pkt = new char [siz];
+  google::protobuf::io::ArrayOutputStream aos(pkt,siz);
+  CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+  coded_output->WriteVarint32(umsg->ByteSize());
+  umsg->SerializeToCodedStream(coded_output);
+
+  cout<<"in send_handler -> BODY: bytecount = " << siz << endl;
+  for (int i = 0; i < siz; i++) 
+  {
+    printf("_%d", pkt[i]);
+  }
+  printf("\n");
+
+  if (write(glob_sockfd[APP], pkt, siz) < 0) 
+  {
+    cout << t->get_thread_name() << ": " << strerror(errno) << endl;
+    kill(getpid(), SIGINT);
+  }
+  cout<<"after write in send_handler"<<endl;
+}
+*/
+////////////////////////////////
+//shutdown code//////
+////////////////////
+void exit_handler(VThread *t) 
+{ 
+  cout << t->get_thread_name() << " terminated" << endl;
+}
+void countdown(int sec) 
+{
+  for (int i = 0; i < sec; i++) 
+  {
+    sleep(1);
+    cout << "countdown to shutdown: " << sec-i << endl;
+  }
+}
+
+
+void shutdown() 
+{ // shutdown server gracefully
+/*  int retval = 0;
+  if (recv_thread_id != 0) {
+    pthread_cancel(recv_thread_id);
+    pthread_join(recv_thread_id, (void **) &retval);
+    if (retval == PTHREAD_CANCELED)
+      cout << "recv_thread canceled" << endl;
+    else
+      cout << "recv_thread cancellation failed" << endl;
+    recv_thread_id = 0;
+  }
+  ecat_var[15].value = 0;
+  ecat_var[14].value = 0;
+  connect_start = 1;
+  if(ecat_var[necat_var - 1].value != 3) {
+    ecat_off();
+    ecat_down();
+  }
+  if(obd2_var[nobd2_var - 1].value != 3) {
+    obd_off();
+    obd_down();
+  }
+  ecat_thread->ExitThread();
+  obd2_thread->ExitThread();
+  //  send_thread->ExitThread();
+  delete ecat_thread; ecat_thread = NULL;
+  delete obd2_thread; obd2_thread = NULL;
+  //delete send_thread; send_thread = NULL;
+  for(int idx = 0; idx < number_of_connections; ++idx) {
+    if (glob_sockfd[idx] >= 0) {
+      close(glob_sockfd[idx]);
+      glob_sockfd[idx] = -1;
+      send_thread[idx]->ExitThread();
+      delete send_thread[idx]; send_thread[idx] = NULL;
+    }
+  }
+  */
+  countdown(3);
+}
+
 
 
 ///////////////////////////////////////////////
 // main function
 ///////////////////////////////////////////////
-
 int main(int argc, char *argv[]) 
 {
+  sigset_t newmask, oldmask, waitmask;
   int c, flag_help = 0;
   char ipaddr[20] = SERVER_IPADDR;
   int portno = SERVER_PORTNO;
   int halfsd, fullsd; // socket descriptors
+  char buffer[4];
   struct sockaddr_in sockaddr;
-  pthread_t tid;
-  
-  while( (c = getopt(argc, argv, "hi:p:")) != -1) 
+
+  memset(buffer, '\0', 4);
+  while((c = getopt(argc, argv, "hi:p:")) != -1) 
   {
     switch(c) 
     {
-        case 'h': flag_help = 1; break;
-        case 'i': memcpy(ipaddr, optarg, strlen(optarg)); break;
-        case 'c': portno = atoi(optarg); break;
-        default:  printf("unknown option : %c\n", optopt); break;
+    case 'h': flag_help = 1; break;
+    case 'i': memcpy(ipaddr, optarg, strlen(optarg)); break;
+    case 'c': portno = atoi(optarg); break;
+    default:  printf("unknown option : %c\n", optopt); break;
     }
   }
+
   if (flag_help == 1) 
   {
     printf("usage: %s [-h] [-i ipaddr] [-p portno] \n", argv[0]);
     exit(1);
   }
-  
   printf("server address = %s:%d\n", ipaddr, portno);
 
-  signal(SIGINT,  signal_handler);
-  signal(SIGTERM, signal_handler);
+  if (signal(SIGINT,  signal_handler) == SIG_ERR) 
+  {
+    printf("error: signal(): %s\n", strerror(errno));
+    exit(1);
+  }
+  if (signal(SIGTERM, signal_handler) == SIG_ERR) 
+  {
+    printf("error: signal(): %s\n", strerror(errno));
+    exit(1);
+  }
 
+  sigemptyset(&waitmask);
+  sigaddset(&waitmask, SIGUSR1);
+  sigemptyset(&newmask);
+  sigaddset(&newmask, SIGINT);
+  sigaddset(&newmask, SIGTERM);
+
+  if (sigprocmask(SIG_BLOCK, &newmask, &oldmask) < 0) 
+  {
+    printf("error: sigprocmask(): %s\n", strerror(errno));
+    exit(1);
+  }
+ 
   init_clients();
-  halfsd = startup_server(ipaddr, portno);
+  if ((halfsd = startup_server(ipaddr, portno)) < 0) 
+  {
+    shutdown();
+    exit(1);
+  }
 
-  while (1) {
-    int len = sizeof(sockaddr);
-    fullsd = accept(halfsd, (struct sockaddr *)&sockaddr, (socklen_t *)&len);
-    if (fullsd < 0) 
-    {
-      printf("error: accept(): %s\n", strerror(errno));
-      exit(1);
-    }
+  while (1) 
+  {
+      int len = sizeof(sockaddr);
+      fullsd = accept(halfsd, (struct sockaddr *)&sockaddr, (socklen_t *)&len);
+      if(fullsd < 0) 
+      {
+          printf("error : accept() : %s\n", strerror(errno));
+          shutdown();
+          break;
+      }
 
-    if (nclients == MAX_CLIENTS) 
-    {
-      printf("error: max clients reached\n");
-      close(fullsd);
-      sleep(60); // wait for a thread to exit for 1 minute
-      continue;
-    }
-    else
-    {
-        if(
-    // register a newly connected client
-    add_client(client_id, fullsd, sockaddr);
-    nclients++;
+      if(nclients == MAX_CLIENTS) 
+      {
+          printf("error: max clients reached\n");
+          close(fullsd);
+          sleep(60); //wait for a thread to exit for 1minute
+          continue;
+      }
 
-    // create a thread to service the client
-    if (pthread_create(&tid, NULL, &receive_Thread, (void *)client_id) < 0) 
-    {
-      printf("error: pthread_create(): %s\n", strerror(errno));
-      close(fullsd);
-      continue;
-    }
-    pthread_detach(tid); // make pthread_join() unnecessary
+      add_client(nclients, fullsd, sockaddr);
 
-    client_id++; // increment client_id for the next incoming client
-  }    
-  
+      if (pthread_create(&recv_thread_id[nclients], NULL, &recv_thread, (void *)&nclients) < 0) 
+      {
+          printf("error: pthread_create(): %s\n", strerror(errno));
+          shutdown();
+          break;
+      }
+
+      send_thread[nclients] = new VThread("send_thread", send_handler, exit_handler);
+      send_thread[nclients]->CreateThread();
+
+      if(connect_start) 
+      {
+          // create the following threads only once --> move the following code outside the while loop
+    /*	ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
+        ecat_thread->CreateThread();
+        obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
+    	obd2_thread->CreateThread();
+        */
+    	connect_start = 0;
+      }
+
+      ++nclients;
+      if(nclients == MAX_CLIENTS) {sigsuspend(&waitmask);}
+      // remove the following line to enable multiple recv_thread's
+      //do {sigsuspend(&waitmask);} while(glob_sockfd >= 0);
+  }
+
+  if (sigprocmask(SIG_SETMASK, &oldmask, NULL) < 0) 
+  {
+    printf("error: sigprocmask(): %s\n", strerror(errno));
+    exit(1);
+  }
+ 
   return 0;
 }
 
