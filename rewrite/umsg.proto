@@ -18,13 +18,13 @@ message Initial_msg // type==0,1,2, serv->app only
     {
         uint32 _from=1;
         string _name=2;
-        uint32 _varID=3;
+        uint32 _varid=3;
         int32  _value=4;
     }
 
     message Prm
     {
-        uint32 _varType=1;
+        uint32 _vartype=1;
         int32  _min=2;
         int32  _max=3;
     }
@@ -33,7 +33,7 @@ message Initial_msg // type==0,1,2, serv->app only
     repeated Prm prm=6;
     uint32 _cycle=7;
 }
-message Operation_msg // type==3 , for operational phase
+message Operational_msg // type==3 , for operational phase
 { 
     uint32 _seqNo=1;
     uint32 _from=2;

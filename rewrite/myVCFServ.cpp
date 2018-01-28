@@ -10,7 +10,7 @@
 #include <regex.h>
 
 #include "VThread.h"
-#include "global.h"
+//#include "global.h"
 
 #include <fstream>
 #include <google/protobuf/util/time_util.h>
@@ -24,19 +24,21 @@ using namespace google::protobuf::io;
 
 #define SERVER_IPADDR "127.0.0.1"
 #define SERVER_PORTNO 9000
-#define MAX_CLIENTS 2
+#define MAX_CLIENTS 2 
 #define MAX_BUFFER 1024
 #define MAX_NAME 20
 
+enum {INIT, ECAT, OBD2};
 int connect_start=1;
 int nclients = 0;
 
 pthread_t recv_thread_id[MAX_CLIENTS];
 VThread *send_thread[MAX_CLIENTS] = {NULL,NULL};
+VThread *init_thread = NULL;
 VThread *ecat_thread = NULL;
 VThread *obd2_thread = NULL;
 ///////////////////////////////////////////////
-// data structure (mutex not implemented!)
+// socket connection data structure (mutex not implemented!)
 ///////////////////////////////////////////////
 struct client_struct 
 {
@@ -145,7 +147,7 @@ int startup_server(char *ipaddr, int portno)
   return sockfd;
 }
 ///////////////////////////////////////////////
-// recv_thread routine for android app
+// recv_thread routine for protobuf
 ///////////////////////////////////////////////
 
 void readHdr(google::protobuf::uint32 hdr[], char *buf)
@@ -158,14 +160,13 @@ void readHdr(google::protobuf::uint32 hdr[], char *buf)
     cout<<"HDR: content (in int32) " << hdr[1] << endl;
 }
 
-
 Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
 {
   int bytecount;
   char buffer[hdr[1]+2];
-  Initial_msg *init_msg;
+  Initial_msg *init_msg = new Initial_msg;
   //Read the entire buffer including the hdr
-  printf("before recv function\n"); 
+  printf("start inital function\n"); 
   if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
   {
     fprintf(stderr, "Error receiving data %d\n", errno);
@@ -193,13 +194,15 @@ Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
   cout<<"Message is "<<init_msg->DebugString()<<endl;
   return init_msg;
 }
-Operation_msg *operation_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
+
+Operational_msg *operational_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
 {
   int bytecount;
   char buffer[hdr[1]+2];
-  Operation_msg *oper_msg;
+  Operational_msg *oper_msg = new Operational_msg;
   //Read the entire buffer including the hdr
-  printf("before recv function\n"); 
+  printf("start operational function\n"); 
+  printf("sockfd = %d\n",sockfd);
   if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
   {
     fprintf(stderr, "Error receiving data %d\n", errno);
@@ -230,69 +233,109 @@ Operation_msg *operation_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
 
 void *recv_thread(void *arg) 
 {
-  int *client_id=(int *)arg;
+  int client_id=*(int *)arg;
   google::protobuf::uint32 hdr[2];
   char buffer[2];
   int bytecount=0;
  
-
+  printf("recv thread created!\n");
   memset(buffer, '\0', 2);
-
+  printf("in recv : client_id = %d  clients[*client_id].sockfd = %d\n",client_id,clients[client_id].sockfd);
   while(1)
   {
-      if((bytecount= recv(clients[*client_id].sockfd, buffer,2,MSG_PEEK))==-1)
+      if((bytecount= recv(clients[client_id].sockfd, buffer,2,MSG_PEEK))==-1)
       {
 	  fprintf(stderr, "Error receiving data %d\n",errno);
       }
       else if(bytecount==0) break;
+
+      for (int i = 0; i < bytecount; i++) 
+      {
+          printf("_%d", buffer[i]);
+      }
+      printf("\n");
      
       readHdr(hdr, buffer);
      
-      if(hdr[1]==3) 
+      if(hdr[0]==1) 
       {
-          Operation_msg *umsg = new Operation_msg;
-          umsg = operation_ReadBody(clients[*client_id].sockfd, hdr);
-          switch(umsg->_to())
+          Operational_msg *umsg;
+          printf("in recv in if: client_id = %d cliets[*client_id].sockfd= %d \n", client_id, clients[client_id].sockfd);
+          umsg = operational_ReadBody(clients[client_id].sockfd, hdr);
+/*          switch(umsg->_to())
           {
               case ECAT:
-                    ecat_thread->PostMsg((const UserMsg *) umsg);
+                    ecat_thread->PostOperationalMsg((const Operational_msg *) umsg);
         	    break;
               case OBD2 : 
-                    obd2_thread->PostMsg((const UserMsg *) umsg);
+                    obd2_thread->PostOperationalMsg((const Operational_msg *) umsg);
                     break;
           }
-          umsg->set__result(1);
-          send_thread[*client_id]->PostMsg((const UserMsg *) umsg);
+  */        umsg->set__result(2);
+          printf("befor PostOperationalMsg\n");
+          send_thread[client_id]->PostOperationalMsg((const Operational_msg *) umsg);
       }
      
-      else if(hdr[1]>=0 && hdr[1]<3)
+      else if(hdr[0]==0)
       {
-          Initial_msg *umsg = new Initial_msg;
-          umsg = initial_ReadBody(clients[*client_id].sockfd, hdr);
-          init_thread->PostMsg((const UserMsg *) umsg);
+          Initial_msg *umsg ;
+          printf("in recv in if: client_id = %d cliets[*client_id].sockfd= %d \n", client_id, clients[client_id].sockfd);
+          umsg = initial_ReadBody(clients[client_id].sockfd, hdr);
+//          init_thread->PostInitialMsg((const Initial_msg *) umsg);
           
-          umsg->set__result(1);
-          send_thread[*client_id]->PostMsg((const UserMsg *) umsg);
+          umsg->set__result(2);
+          send_thread[client_id]->PostInitialMsg((const Initial_msg *) umsg);
       }
      
       else 
       {
           printf("unknown type\n");
       }
+      printf("recv end\n");
   }
 }
-/*
+
+/////////////////////////////////////////////////////
+// send_thread routine for protobuf
+////////////////////////////////////////////////////
+
 void send_handler(VThread *t, ThreadMsg *msg) 
 {
-  cout << "Ptoro Send" << endl;
-  const Umsg* umsg = static_cast<const Umsg*>(msg->msg);
-  cout<<"size after serilizing is "<<umsg->ByteSize()<<endl;
-  int siz = umsg->ByteSize()+1;
-  char *pkt = new char [siz];
-  google::protobuf::io::ArrayOutputStream aos(pkt,siz);
-  CodedOutputStream *coded_output = new CodedOutputStream(&aos);
-  coded_output->WriteVarint32(umsg->ByteSize());
-  umsg->SerializeToCodedStream(coded_output);
+  cout << "Proto Send" << endl;
+  int msg_type = msg->msgType;
+  int siz;
+  char *pkt;
+  switch(msg_type)
+  {
+      case 1 :
+      {
+              const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
+              cout<<"size after serilizing is "<<oper_msg->ByteSize()<<endl;
+              siz = oper_msg->ByteSize()+2;
+              pkt = new char [siz];
+              google::protobuf::io::ArrayOutputStream aos(pkt,siz);
+              CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+              coded_output->WriteVarint32(msg_type);
+              coded_output->WriteVarint32(siz);
+              oper_msg->SerializeToCodedStream(coded_output);
+              cout<<"in send_handler -> oper Message is \n"<<oper_msg->DebugString()<<endl;
+              break;
+      }
+      case 0 :
+      {
+              const Initial_msg* init_msg = static_cast<const Initial_msg*>(msg->msg);
+              cout<<"size after serilizing is "<<init_msg->ByteSize()<<endl;
+              siz = init_msg->ByteSize()+2;
+              pkt = new char [siz];
+              google::protobuf::io::ArrayOutputStream aos(pkt,siz);
+              CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+              coded_output->WriteVarint32(msg_type);
+              coded_output->WriteVarint32(siz);
+              init_msg->SerializeToCodedStream(coded_output);
+              cout<<"in send_handler -> init Message is \n"<<init_msg->DebugString()<<endl;
+              break;
+      }
+  }
 
   cout<<"in send_handler -> BODY: bytecount = " << siz << endl;
   for (int i = 0; i < siz; i++) 
@@ -301,14 +344,17 @@ void send_handler(VThread *t, ThreadMsg *msg)
   }
   printf("\n");
 
-  if (write(glob_sockfd[APP], pkt, siz) < 0) 
+  for(int i = 0 ; i<= nclients; ++i)
   {
-    cout << t->get_thread_name() << ": " << strerror(errno) << endl;
-    kill(getpid(), SIGINT);
+      if (write(clients[i].sockfd, pkt, siz) < 0) 
+      {
+          cout << t->get_thread_name() << ": " << strerror(errno) << endl;
+          kill(getpid(), SIGINT);
+      }
+      cout<<"after write in send_handler"<<endl;
   }
-  cout<<"after write in send_handler"<<endl;
 }
-*/
+
 ////////////////////////////////
 //shutdown code//////
 ////////////////////
@@ -435,6 +481,7 @@ int main(int argc, char *argv[])
   {
       int len = sizeof(sockaddr);
       fullsd = accept(halfsd, (struct sockaddr *)&sockaddr, (socklen_t *)&len);
+    
       if(fullsd < 0) 
       {
           printf("error : accept() : %s\n", strerror(errno));
@@ -442,6 +489,7 @@ int main(int argc, char *argv[])
           break;
       }
 
+      printf("Connected\n");
       if(nclients == MAX_CLIENTS) 
       {
           printf("error: max clients reached\n");
@@ -451,29 +499,31 @@ int main(int argc, char *argv[])
       }
 
       add_client(nclients, fullsd, sockaddr);
-
+      printf("fullsd = %d\n",fullsd);
       if (pthread_create(&recv_thread_id[nclients], NULL, &recv_thread, (void *)&nclients) < 0) 
       {
           printf("error: pthread_create(): %s\n", strerror(errno));
           shutdown();
           break;
       }
-
+      
       send_thread[nclients] = new VThread("send_thread", send_handler, exit_handler);
       send_thread[nclients]->CreateThread();
 
       if(connect_start) 
       {
           // create the following threads only once --> move the following code outside the while loop
-    /*	ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
+    /*	init_thread = new VThread("init_thread", init_handler, exit_handler);
+        init_thread->CreateThread();
+     	ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
         ecat_thread->CreateThread();
         obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
     	obd2_thread->CreateThread();
         */
     	connect_start = 0;
       }
-
-      ++nclients;
+      sleep(1);//because of lock nclients
+      ++nclients;  
       if(nclients == MAX_CLIENTS) {sigsuspend(&waitmask);}
       // remove the following line to enable multiple recv_thread's
       //do {sigsuspend(&waitmask);} while(glob_sockfd >= 0);

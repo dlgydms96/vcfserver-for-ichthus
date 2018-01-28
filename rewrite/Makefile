@@ -7,7 +7,12 @@ PBCC_FLAGS= umsg.pb.cc
 PROTO_FLAGS= `pkg-config --cflags --libs protobuf`
 DEBUG=0
 
+
 all:: protoc_middleman javas_middleman javac_middleman Client_cpp.exe VCFServ_cpp.exe Client_java.exe Server_java.exe
+
+proto: protoc_middleman
+
+cpp: Client_cpp.exe Server_cpp.exe 
 
 protoc_middleman: umsg.proto
 	protoc -I=. --cpp_out=. --java_out=. ./umsg.proto
@@ -18,7 +23,7 @@ javac_middleman: Client.java protoc_middleman
 javas_middleman: Server.java protoc_middleman
 	javac -cp $$CLASSPATH Server.java com/rubicom/vcf/UmsgProtos.java
 	@touch javas_middleman
-VCFServ_cpp.exe: VCFServ.cpp 
+Server_cpp.exe: myVCFServ.cpp 
 	$(GG) -o $@ $^ $(PBCC_FLAGS) $(CFLAGS) $(LDFLAGS) $(PROTO_FLAGS)
 Client_cpp.exe: Client.cc
 	$(CC) $^ $(PBCC_FLAGS) -o $@ $(PROTO_FLAGS)
