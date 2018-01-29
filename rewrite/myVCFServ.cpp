@@ -106,13 +106,6 @@ void delete_client(int id)
 // system programming 
 ///////////////////////////////////////////////
 
-void signal_handler(int signo) {
-  if (signo == SIGINT || signo == SIGTERM) {
-    // shutdown server gracefully.
-    // close all socket descriptors.
-    exit(0);
-  }
-}
 
 int startup_server(char *ipaddr, int portno)
 {
@@ -156,8 +149,8 @@ void readHdr(google::protobuf::uint32 hdr[], char *buf)
     CodedInputStream coded_input(&ais);
     coded_input.ReadVarint32(&hdr[0]);
     coded_input.ReadVarint32(&hdr[1]);
-    cout<<"HDR: type (in int32) " << hdr[0] << endl;
-    cout<<"HDR: content (in int32) " << hdr[1] << endl;
+    cout<<"\tHDR: type (in int32) " << hdr[0] << endl;
+    cout<<"\tHDR: content (in int32) " << hdr[1] << endl;
 }
 
 Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
@@ -166,12 +159,12 @@ Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
   char buffer[hdr[1]+2];
   Initial_msg *init_msg = new Initial_msg;
   //Read the entire buffer including the hdr
-  printf("start inital function\n"); 
+  printf("*****start inital function*******\n"); 
   if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
   {
     fprintf(stderr, "Error receiving data %d\n", errno);
   }
-  cout<<"BODY: bytecount = " << bytecount << endl;
+  cout<<"\tBODY: bytecount = " << bytecount << endl;
   for (int i = 0; i < bytecount; i++) 
   {
     printf("_%d", buffer[i]);
@@ -191,7 +184,7 @@ Initial_msg *initial_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
   //Once the embedded message has been parsed, PopLimit() is called to undo the limit
   coded_input.PopLimit(msgLimit);
   //Print the message
-  cout<<"Message is "<<init_msg->DebugString()<<endl;
+  cout<<"\tMessage is "<<init_msg->DebugString()<<endl;
   return init_msg;
 }
 
@@ -201,13 +194,13 @@ Operational_msg *operational_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
   char buffer[hdr[1]+2];
   Operational_msg *oper_msg = new Operational_msg;
   //Read the entire buffer including the hdr
-  printf("start operational function\n"); 
-  printf("sockfd = %d\n",sockfd);
+  printf("******start operational function**********\n"); 
+  printf("\tsockfd = %d\n",sockfd);
   if((bytecount = recv(sockfd, (void *)buffer, hdr[1]+2, MSG_WAITALL))== -1)
   {
     fprintf(stderr, "Error receiving data %d\n", errno);
   }
-  cout<<"BODY: bytecount = " << bytecount << endl;
+  cout<<"\tBODY: bytecount = " << bytecount << endl;
   for (int i = 0; i < bytecount; i++) 
   {
     printf("_%d", buffer[i]);
@@ -227,28 +220,28 @@ Operational_msg *operational_ReadBody(int sockfd, google::protobuf::uint32 *hdr)
   //Once the embedded message has been parsed, PopLimit() is called to undo the limit
   coded_input.PopLimit(msgLimit);
   //Print the message
-  cout<<"Message is "<<oper_msg->DebugString()<<endl;
+  cout<<"\tMessage is \n"<<oper_msg->DebugString()<<endl;
   return oper_msg;
 }
 
 void *recv_thread(void *arg) 
 {
-  int client_id=*(int *)arg;
+  int client_idx=*(int *)arg;
   google::protobuf::uint32 hdr[2];
   char buffer[2];
   int bytecount=0;
  
-  printf("recv thread created!\n");
+  printf("******recv thread created!*******\n");
   memset(buffer, '\0', 2);
-  printf("in recv : client_id = %d  clients[*client_id].sockfd = %d\n",client_id,clients[client_id].sockfd);
+  printf("\tin recv : client_idx = %d  clients[*client_idx].sockfd = %d\n",client_idx,clients[client_idx].sockfd);
   while(1)
   {
-      if((bytecount= recv(clients[client_id].sockfd, buffer,2,MSG_PEEK))==-1)
+      if((bytecount= recv(clients[client_idx].sockfd, buffer,2,MSG_PEEK))==-1)
       {
 	  fprintf(stderr, "Error receiving data %d\n",errno);
       }
       else if(bytecount==0) break;
-
+      printf("#############Message received##################\n\t");
       for (int i = 0; i < bytecount; i++) 
       {
           printf("_%d", buffer[i]);
@@ -260,8 +253,9 @@ void *recv_thread(void *arg)
       if(hdr[0]==1) 
       {
           Operational_msg *umsg;
-          printf("in recv in if: client_id = %d cliets[*client_id].sockfd= %d \n", client_id, clients[client_id].sockfd);
-          umsg = operational_ReadBody(clients[client_id].sockfd, hdr);
+          printf("#############It's Operational_msg################\n\t");
+          printf("\tin recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
+          umsg = operational_ReadBody(clients[client_idx].sockfd, hdr);
 /*          switch(umsg->_to())
           {
               case ECAT:
@@ -272,19 +266,20 @@ void *recv_thread(void *arg)
                     break;
           }
   */        umsg->set__result(2);
-          printf("befor PostOperationalMsg\n");
-          send_thread[client_id]->PostOperationalMsg((const Operational_msg *) umsg);
+          printf("\tbefor PostOperationalMsg\n");
+          send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
       }
      
       else if(hdr[0]==0)
       {
           Initial_msg *umsg ;
-          printf("in recv in if: client_id = %d cliets[*client_id].sockfd= %d \n", client_id, clients[client_id].sockfd);
-          umsg = initial_ReadBody(clients[client_id].sockfd, hdr);
+          printf("#############It's Initial_msg################\n\t");
+          printf("in recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
+          umsg = initial_ReadBody(clients[client_idx].sockfd, hdr);
 //          init_thread->PostInitialMsg((const Initial_msg *) umsg);
           
           umsg->set__result(2);
-          send_thread[client_id]->PostInitialMsg((const Initial_msg *) umsg);
+          send_thread[client_idx]->PostInitialMsg((const Initial_msg *) umsg);
       }
      
       else 
@@ -301,7 +296,7 @@ void *recv_thread(void *arg)
 
 void send_handler(VThread *t, ThreadMsg *msg) 
 {
-  cout << "Proto Send" << endl;
+  cout << "****Proto Send****" << endl;
   int msg_type = msg->msgType;
   int siz;
   char *pkt;
@@ -310,24 +305,24 @@ void send_handler(VThread *t, ThreadMsg *msg)
       case 1 :
       {
               const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
-              cout<<"size after serilizing is "<<oper_msg->ByteSize()<<endl;
-              siz = oper_msg->ByteSize()+2;
-              pkt = new char [siz];
-              google::protobuf::io::ArrayOutputStream aos(pkt,siz);
+              cout<<"\tsize after serilizing is "<<oper_msg->ByteSize()<<endl;
+              siz = oper_msg->ByteSize();
+              pkt = new char [siz+2];
+              google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
               CodedOutputStream *coded_output = new CodedOutputStream(&aos);
               coded_output->WriteVarint32(msg_type);
               coded_output->WriteVarint32(siz);
               oper_msg->SerializeToCodedStream(coded_output);
-              cout<<"in send_handler -> oper Message is \n"<<oper_msg->DebugString()<<endl;
+              cout<<"\tin send_handler -> oper Message is \n"<<oper_msg->DebugString()<<endl;
               break;
       }
       case 0 :
       {
               const Initial_msg* init_msg = static_cast<const Initial_msg*>(msg->msg);
-              cout<<"size after serilizing is "<<init_msg->ByteSize()<<endl;
-              siz = init_msg->ByteSize()+2;
-              pkt = new char [siz];
-              google::protobuf::io::ArrayOutputStream aos(pkt,siz);
+              cout<<"\tsize after serilizing is "<<init_msg->ByteSize()<<endl;
+              siz = init_msg->ByteSize();
+              pkt = new char [siz+2];
+              google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
               CodedOutputStream *coded_output = new CodedOutputStream(&aos);
               coded_output->WriteVarint32(msg_type);
               coded_output->WriteVarint32(siz);
@@ -337,8 +332,8 @@ void send_handler(VThread *t, ThreadMsg *msg)
       }
   }
 
-  cout<<"in send_handler -> BODY: bytecount = " << siz << endl;
-  for (int i = 0; i < siz; i++) 
+  cout<<"\tin send_handler -> \nBODY: bytecount = " << siz << endl;
+  for (int i = 0; i < siz+2; i++) 
   {
     printf("_%d", pkt[i]);
   }
@@ -346,12 +341,12 @@ void send_handler(VThread *t, ThreadMsg *msg)
 
   for(int i = 0 ; i<= nclients; ++i)
   {
-      if (write(clients[i].sockfd, pkt, siz) < 0) 
+      if (write(clients[i].sockfd, pkt, siz+2) < 0) 
       {
           cout << t->get_thread_name() << ": " << strerror(errno) << endl;
           kill(getpid(), SIGINT);
       }
-      cout<<"after write in send_handler"<<endl;
+      cout<<"\tafter write in send_handler\n"<<endl;
   }
 }
 
@@ -413,6 +408,17 @@ void shutdown()
   countdown(3);
 }
 
+void signal_handler(int signo) {
+  if (signo != SIGINT || signo != SIGTERM) 
+  {
+      cout << "unexpected signal = " <<signo<<endl;
+      exit(0);
+  }
+
+  shutdown();
+  exit(0);
+}
+
 
 
 ///////////////////////////////////////////////
@@ -427,6 +433,7 @@ int main(int argc, char *argv[])
   int halfsd, fullsd; // socket descriptors
   char buffer[4];
   struct sockaddr_in sockaddr;
+  int idx;
 
   memset(buffer, '\0', 4);
   while((c = getopt(argc, argv, "hi:p:")) != -1) 
@@ -499,8 +506,10 @@ int main(int argc, char *argv[])
       }
 
       add_client(nclients, fullsd, sockaddr);
+      idx=find_client_by_id(nclients);
+      
       printf("fullsd = %d\n",fullsd);
-      if (pthread_create(&recv_thread_id[nclients], NULL, &recv_thread, (void *)&nclients) < 0) 
+      if (pthread_create(&recv_thread_id[nclients], NULL, &recv_thread, (void *)&idx) < 0) 
       {
           printf("error: pthread_create(): %s\n", strerror(errno));
           shutdown();
@@ -522,9 +531,8 @@ int main(int argc, char *argv[])
         */
     	connect_start = 0;
       }
-      sleep(1);//because of lock nclients
       ++nclients;  
-      if(nclients == MAX_CLIENTS) {sigsuspend(&waitmask);}
+      if(find_empty_client() == -1) {sigsuspend(&waitmask);}
       // remove the following line to enable multiple recv_thread's
       //do {sigsuspend(&waitmask);} while(glob_sockfd >= 0);
   }
