@@ -95,7 +95,10 @@ VThread::~VThread() {	ExitThread(); }
 bool VThread::CreateThread() 
 {
   if (!m_thread)
+  {
+      cout<<"thread create!!"<<endl;
     m_thread = new thread(&VThread::Process, this);
+  }
   return true;
 }
 

@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <pthread.h>
 #include <regex.h>
+#include <pthread.h>
 
 #include "VThread.h"
 //#include "global.h"
@@ -24,7 +25,7 @@ using namespace google::protobuf::io;
 
 #define SERVER_IPADDR "127.0.0.1"
 #define SERVER_PORTNO 9000
-#define MAX_CLIENTS 2 
+#define MAX_CLIENTS 1 
 #define MAX_BUFFER 1024
 #define MAX_NAME 20
 
@@ -33,7 +34,7 @@ int connect_start=1;
 int nclients = 0;
 
 pthread_t recv_thread_id[MAX_CLIENTS];
-VThread *send_thread[MAX_CLIENTS] = {NULL,NULL};
+VThread *send_thread[MAX_CLIENTS] = {NULL};
 VThread *init_thread = NULL;
 VThread *ecat_thread = NULL;
 VThread *obd2_thread = NULL;
@@ -97,6 +98,7 @@ void delete_client(int id)
     printf("error: unknown id\n");
     exit(1);
   }
+  close(clients[idx].sockfd);
   clients[idx].sockfd = -1;
   printf("client[%d] deleted (id=%d)\n", idx, id);
 }
@@ -339,7 +341,7 @@ void send_handler(VThread *t, ThreadMsg *msg)
   }
   printf("\n");
 
-  for(int i = 0 ; i<= nclients; ++i)
+  for(int i = 0 ; i< nclients; ++i)
   {
       if (write(clients[i].sockfd, pkt, siz+2) < 0) 
       {
@@ -369,17 +371,24 @@ void countdown(int sec)
 
 void shutdown() 
 { // shutdown server gracefully
-/*  int retval = 0;
-  if (recv_thread_id != 0) {
-    pthread_cancel(recv_thread_id);
-    pthread_join(recv_thread_id, (void **) &retval);
-    if (retval == PTHREAD_CANCELED)
-      cout << "recv_thread canceled" << endl;
-    else
-      cout << "recv_thread cancellation failed" << endl;
-    recv_thread_id = 0;
+  int retval = 0;
+  int idx = 0;
+  while(idx < MAX_CLIENTS)
+  {
+    if(recv_thread_id[idx] != 0) 
+    {
+        pthread_cancel(recv_thread_id[idx]);
+        pthread_join(recv_thread_id[idx], (void **) &retval);
+        if (retval == PTHREAD_CANCELED)
+            cout << "recv_thread canceled" << endl;
+        else
+            cout << "recv_thread cancellation failed" << endl;
+        recv_thread_id[idx] = 0;
+    }
+        ++idx;
   }
-  ecat_var[15].value = 0;
+  idx=0;
+/*  ecat_var[15].value = 0;
   ecat_var[14].value = 0;
   connect_start = 1;
   if(ecat_var[necat_var - 1].value != 3) {
@@ -392,26 +401,30 @@ void shutdown()
   }
   ecat_thread->ExitThread();
   obd2_thread->ExitThread();
-  //  send_thread->ExitThread();
   delete ecat_thread; ecat_thread = NULL;
   delete obd2_thread; obd2_thread = NULL;
-  //delete send_thread; send_thread = NULL;
-  for(int idx = 0; idx < number_of_connections; ++idx) {
-    if (glob_sockfd[idx] >= 0) {
-      close(glob_sockfd[idx]);
-      glob_sockfd[idx] = -1;
+ */
+  while(idx < MAX_CLIENTS) 
+  {
+    if (clients[idx].sockfd >= 0) 
+    {
+      delete_client(idx);
       send_thread[idx]->ExitThread();
       delete send_thread[idx]; send_thread[idx] = NULL;
     }
+    ++idx;
   }
-  */
+  
   countdown(3);
 }
 
-void signal_handler(int signo) {
-  if (signo != SIGINT || signo != SIGTERM) 
+void signal_handler(int signo)
+{
+      cout << SIGINT <<endl;
+  if ((signo =! SIGINT) || (signo =! SIGTERM))
   {
-      cout << "unexpected signal = " <<signo<<endl;
+      cout << SIGINT <<endl;
+      cout << "unexpected signal = " <<signo<<" '"<<strerror(signo)<<"'"<<endl;
       exit(0);
   }
 
