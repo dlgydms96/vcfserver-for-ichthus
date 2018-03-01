@@ -11,7 +11,9 @@
 #include <pthread.h>
 
 #include "VThread.h"
-//#include "global.h"
+#include "global.h"
+#include "HybridAutomata.h"
+#include "ecat.h"
 
 #include <fstream>
 #include <google/protobuf/util/time_util.h>
@@ -29,7 +31,9 @@ using namespace google::protobuf::io;
 #define MAX_BUFFER 1024
 #define MAX_NAME 20
 
-enum {INIT, ECAT, OBD2};
+struct ECAT ecat_var;
+struct OBD2 obd2_var;
+
 int connect_start=1;
 int nclients = 0;
 
@@ -38,7 +42,9 @@ VThread *send_thread[MAX_CLIENTS] = {NULL};
 VThread *init_thread = NULL;
 VThread *ecat_thread = NULL;
 VThread *obd2_thread = NULL;
-///////////////////////////////////////////////
+
+
+//////////////////////////////////////////////
 // socket connection data structure (mutex not implemented!)
 ///////////////////////////////////////////////
 struct client_struct 
@@ -100,7 +106,73 @@ void delete_client(int id)
   }
   close(clients[idx].sockfd);
   clients[idx].sockfd = -1;
-  printf("client[%d] deleted (id=%d)\n", idx, id);
+
+}
+
+////////////////////////////////
+//shutdown code//////
+////////////////////
+void exit_handler(VThread *t) 
+{ 
+  cout << t->get_thread_name() << " terminated" << endl;
+}
+void countdown(int sec) 
+{
+  for (int i = 0; i < sec; i++) 
+  {
+    sleep(1);
+    cout << "countdown to shutdown: " << sec-i << endl;
+  }
+}
+
+
+void shutdown() 
+{ // shutdown server gracefully
+  int retval = 0;
+  int idx = 0;
+  while(idx < MAX_CLIENTS)
+  {
+    if(recv_thread_id[idx] != 0) 
+    {
+        pthread_cancel(recv_thread_id[idx]);
+        pthread_join(recv_thread_id[idx], (void **) &retval);
+        if (retval == PTHREAD_CANCELED)
+            cout << "recv_thread canceled" << endl;
+        else
+            cout << "recv_thread cancellation failed" << endl;
+        recv_thread_id[idx] = 0;
+    }
+        ++idx;
+  }
+  idx=0;
+/*  ecat_var[15].value = 0;
+  ecat_var[14].value = 0;
+  connect_start = 1;
+  if(ecat_var[necat_var - 1].value != 3) {
+    ecat_off();
+    ecat_down();
+  }
+  if(obd2_var[nobd2_var - 1].value != 3) {
+    obd_off();
+    obd_down();
+  }
+  ecat_thread->ExitThread();
+  obd2_thread->ExitThread();
+  delete ecat_thread; ecat_thread = NULL;
+  delete obd2_thread; obd2_thread = NULL;
+ */
+  while(idx < MAX_CLIENTS) 
+  {
+    if (clients[idx].sockfd >= 0) 
+    {
+      delete_client(idx);
+      send_thread[idx]->ExitThread();
+      delete send_thread[idx]; send_thread[idx] = NULL;
+    }
+    ++idx;
+  }
+  
+  countdown(3);
 }
 
 
@@ -108,7 +180,20 @@ void delete_client(int id)
 // system programming 
 ///////////////////////////////////////////////
 
+void signal_handler(int signo)
+{
+  if ((signo =! SIGINT) || (signo =! SIGTERM))
+  {
+      cout << "unexpected signal = " <<signo<<" '"<<strerror(signo)<<"'"<<endl;
+      exit(0);
+  }
 
+  shutdown();
+  exit(0);
+}
+
+
+ 
 int startup_server(char *ipaddr, int portno)
 {
   struct sockaddr_in sockaddr;
@@ -258,16 +343,16 @@ void *recv_thread(void *arg)
           printf("#############It's Operational_msg################\n\t");
           printf("\tin recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
           umsg = operational_ReadBody(clients[client_idx].sockfd, hdr);
-/*          switch(umsg->_to())
+          switch(umsg->_to())
           {
               case ECAT:
                     ecat_thread->PostOperationalMsg((const Operational_msg *) umsg);
         	    break;
-              case OBD2 : 
+/*              case OBD2 : 
                     obd2_thread->PostOperationalMsg((const Operational_msg *) umsg);
                     break;
-          }
-  */        umsg->set__result(2);
+ */         }
+          umsg->set__result(2);
           printf("\tbefor PostOperationalMsg\n");
           send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
       }
@@ -292,6 +377,58 @@ void *recv_thread(void *arg)
   }
 }
 
+/////////////////////////////////////////////////////
+// 3 manager_threads
+////////////////////////////////////////////////////
+
+void ecat_handler(VThread *t, ThreadMsg *msg)
+{
+    const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
+    static char *debug_msg[] = {"Step : ecatup\n", "Step : ecaton\n", "Step : ecatoff\n", "Step : ecatdown\n"};
+    if((oper_msg->_varid()) == (ecat_var.ecat_state.varID))
+    {
+        HA_ecatmgr.operate(oper_msg->_value());
+    }
+}
+/*
+void obd2_handler(VThread *t, ThreadMsg *msg)
+{
+    const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
+    static char *debug_msg[] = {"Step : obdup\n", "Step : obdon\n", "Step : obdoff\n", "Step : obddown\n"};
+    if((oper_msg->_varid()) == (obd2_var.obd2_state.varID))
+    {
+    }
+}
+*/
+
+/////////////////////////////////////////////////////
+// about HybridAutomata
+////////////////////////////////////////////////////
+
+void HA_EcatMgrThread()
+{
+    HybridAutomata *HA_ecatmgr = new HybridAutomata(ECAT_UP, ECAT_DOWN);
+    setState(ECAT_UP, ecat_up);
+    setState(ECAT_ON, ecat_on);
+    setState(ECAT_OFF, ecat_off);
+    setState(ECAT_DOWN, ecat_down);
+    setCondition(ECAT_UP,ECAT_ON);
+    setCondition(ECAT_ON,ECAT_OFF);
+    setCondition(ECAT_OFF,ECAT_DOWN);
+    setCondition(ECAT_DOWN,ECAT_UP);
+    setCondition(ECAT_OFF,ECAT_ON);
+    setCondition(ECAT_ON,ECAT_DOWN);
+}
+/*
+void HA_Obd2MgrThread()
+{
+    HybridAutomata *HA_obd2mgr = new HybridAutomata(OBD2_UP OBD2_DOWN);
+    setState(OBD2_UP, obd2_up);
+    setState(OBD2_ON, obd2_on);
+    setState(OBD2_OFF, obd2_off);
+    setState(OBD2_DOWN, obd2_down);
+}
+*/
 /////////////////////////////////////////////////////
 // send_thread routine for protobuf
 ////////////////////////////////////////////////////
@@ -335,7 +472,7 @@ void send_handler(VThread *t, ThreadMsg *msg)
   }
 
   cout<<"\tin send_handler -> \nBODY: bytecount = " << siz << endl;
-  for (int i = 0; i < siz+2; i++) 
+  for (int i = 0; i < siz+2; ++i) 
   {
     printf("_%d", pkt[i]);
   }
@@ -350,86 +487,6 @@ void send_handler(VThread *t, ThreadMsg *msg)
       }
       cout<<"\tafter write in send_handler\n"<<endl;
   }
-}
-
-////////////////////////////////
-//shutdown code//////
-////////////////////
-void exit_handler(VThread *t) 
-{ 
-  cout << t->get_thread_name() << " terminated" << endl;
-}
-void countdown(int sec) 
-{
-  for (int i = 0; i < sec; i++) 
-  {
-    sleep(1);
-    cout << "countdown to shutdown: " << sec-i << endl;
-  }
-}
-
-
-void shutdown() 
-{ // shutdown server gracefully
-  int retval = 0;
-  int idx = 0;
-  while(idx < MAX_CLIENTS)
-  {
-    if(recv_thread_id[idx] != 0) 
-    {
-        pthread_cancel(recv_thread_id[idx]);
-        pthread_join(recv_thread_id[idx], (void **) &retval);
-        if (retval == PTHREAD_CANCELED)
-            cout << "recv_thread canceled" << endl;
-        else
-            cout << "recv_thread cancellation failed" << endl;
-        recv_thread_id[idx] = 0;
-    }
-        ++idx;
-  }
-  idx=0;
-/*  ecat_var[15].value = 0;
-  ecat_var[14].value = 0;
-  connect_start = 1;
-  if(ecat_var[necat_var - 1].value != 3) {
-    ecat_off();
-    ecat_down();
-  }
-  if(obd2_var[nobd2_var - 1].value != 3) {
-    obd_off();
-    obd_down();
-  }
-  ecat_thread->ExitThread();
-  obd2_thread->ExitThread();
-  delete ecat_thread; ecat_thread = NULL;
-  delete obd2_thread; obd2_thread = NULL;
- */
-  while(idx < MAX_CLIENTS) 
-  {
-    if (clients[idx].sockfd >= 0) 
-    {
-      delete_client(idx);
-      send_thread[idx]->ExitThread();
-      delete send_thread[idx]; send_thread[idx] = NULL;
-    }
-    ++idx;
-  }
-  
-  countdown(3);
-}
-
-void signal_handler(int signo)
-{
-      cout << SIGINT <<endl;
-  if ((signo =! SIGINT) || (signo =! SIGTERM))
-  {
-      cout << SIGINT <<endl;
-      cout << "unexpected signal = " <<signo<<" '"<<strerror(signo)<<"'"<<endl;
-      exit(0);
-  }
-
-  shutdown();
-  exit(0);
 }
 
 
@@ -537,12 +594,14 @@ int main(int argc, char *argv[])
           // create the following threads only once --> move the following code outside the while loop
     /*	init_thread = new VThread("init_thread", init_handler, exit_handler);
         init_thread->CreateThread();
-     	ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
-        ecat_thread->CreateThread();
+    
         obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
     	obd2_thread->CreateThread();
-        */
-    	connect_start = 0;
+   */ 
+        HA_EcatMgrThread();
+      	ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
+        ecat_thread->CreateThread();
+   	connect_start = 0;
       }
       ++nclients;  
       if(find_empty_client() == -1) {sigsuspend(&waitmask);}
