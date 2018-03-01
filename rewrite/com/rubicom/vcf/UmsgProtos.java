@@ -216,6 +216,7 @@ public final class UmsgProtos {
       return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_descriptor;
     }
 
+    @java.lang.Override
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
       return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_fieldAccessorTable
@@ -340,6 +341,7 @@ public final class UmsgProtos {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Cmd_descriptor;
       }
 
+      @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Cmd_fieldAccessorTable
@@ -409,6 +411,7 @@ public final class UmsgProtos {
       }
 
       private byte memoizedIsInitialized = -1;
+      @java.lang.Override
       public final boolean isInitialized() {
         byte isInitialized = memoizedIsInitialized;
         if (isInitialized == 1) return true;
@@ -418,6 +421,7 @@ public final class UmsgProtos {
         return true;
       }
 
+      @java.lang.Override
       public void writeTo(com.google.protobuf.CodedOutputStream output)
                           throws java.io.IOException {
         if (From_ != 0) {
@@ -435,6 +439,7 @@ public final class UmsgProtos {
         unknownFields.writeTo(output);
       }
 
+      @java.lang.Override
       public int getSerializedSize() {
         int size = memoizedSize;
         if (size != -1) return size;
@@ -573,6 +578,7 @@ public final class UmsgProtos {
             .parseWithIOException(PARSER, input, extensionRegistry);
       }
 
+      @java.lang.Override
       public Builder newBuilderForType() { return newBuilder(); }
       public static Builder newBuilder() {
         return DEFAULT_INSTANCE.toBuilder();
@@ -580,6 +586,7 @@ public final class UmsgProtos {
       public static Builder newBuilder(com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd prototype) {
         return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
       }
+      @java.lang.Override
       public Builder toBuilder() {
         return this == DEFAULT_INSTANCE
             ? new Builder() : new Builder().mergeFrom(this);
@@ -603,6 +610,7 @@ public final class UmsgProtos {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Cmd_descriptor;
         }
 
+        @java.lang.Override
         protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
             internalGetFieldAccessorTable() {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Cmd_fieldAccessorTable
@@ -625,6 +633,7 @@ public final class UmsgProtos {
                   .alwaysUseFieldBuilders) {
           }
         }
+        @java.lang.Override
         public Builder clear() {
           super.clear();
           From_ = 0;
@@ -638,15 +647,18 @@ public final class UmsgProtos {
           return this;
         }
 
+        @java.lang.Override
         public com.google.protobuf.Descriptors.Descriptor
             getDescriptorForType() {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Cmd_descriptor;
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd getDefaultInstanceForType() {
           return com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd.getDefaultInstance();
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd build() {
           com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd result = buildPartial();
           if (!result.isInitialized()) {
@@ -655,6 +667,7 @@ public final class UmsgProtos {
           return result;
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd buildPartial() {
           com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd result = new com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd(this);
           result.From_ = From_;
@@ -665,32 +678,39 @@ public final class UmsgProtos {
           return result;
         }
 
+        @java.lang.Override
         public Builder clone() {
           return (Builder) super.clone();
         }
+        @java.lang.Override
         public Builder setField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             java.lang.Object value) {
           return (Builder) super.setField(field, value);
         }
+        @java.lang.Override
         public Builder clearField(
             com.google.protobuf.Descriptors.FieldDescriptor field) {
           return (Builder) super.clearField(field);
         }
+        @java.lang.Override
         public Builder clearOneof(
             com.google.protobuf.Descriptors.OneofDescriptor oneof) {
           return (Builder) super.clearOneof(oneof);
         }
+        @java.lang.Override
         public Builder setRepeatedField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             int index, java.lang.Object value) {
           return (Builder) super.setRepeatedField(field, index, value);
         }
+        @java.lang.Override
         public Builder addRepeatedField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             java.lang.Object value) {
           return (Builder) super.addRepeatedField(field, value);
         }
+        @java.lang.Override
         public Builder mergeFrom(com.google.protobuf.Message other) {
           if (other instanceof com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd) {
             return mergeFrom((com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd)other);
@@ -720,10 +740,12 @@ public final class UmsgProtos {
           return this;
         }
 
+        @java.lang.Override
         public final boolean isInitialized() {
           return true;
         }
 
+        @java.lang.Override
         public Builder mergeFrom(
             com.google.protobuf.CodedInputStream input,
             com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -888,11 +910,13 @@ public final class UmsgProtos {
           onChanged();
           return this;
         }
+        @java.lang.Override
         public final Builder setUnknownFields(
             final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.setUnknownFieldsProto3(unknownFields);
         }
 
+        @java.lang.Override
         public final Builder mergeUnknownFields(
             final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.mergeUnknownFields(unknownFields);
@@ -914,6 +938,7 @@ public final class UmsgProtos {
 
       private static final com.google.protobuf.Parser<Cmd>
           PARSER = new com.google.protobuf.AbstractParser<Cmd>() {
+        @java.lang.Override
         public Cmd parsePartialFrom(
             com.google.protobuf.CodedInputStream input,
             com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -931,6 +956,7 @@ public final class UmsgProtos {
         return PARSER;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Initial_msg.Cmd getDefaultInstanceForType() {
         return DEFAULT_INSTANCE;
       }
@@ -1037,6 +1063,7 @@ public final class UmsgProtos {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Prm_descriptor;
       }
 
+      @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Prm_fieldAccessorTable
@@ -1072,6 +1099,7 @@ public final class UmsgProtos {
       }
 
       private byte memoizedIsInitialized = -1;
+      @java.lang.Override
       public final boolean isInitialized() {
         byte isInitialized = memoizedIsInitialized;
         if (isInitialized == 1) return true;
@@ -1081,6 +1109,7 @@ public final class UmsgProtos {
         return true;
       }
 
+      @java.lang.Override
       public void writeTo(com.google.protobuf.CodedOutputStream output)
                           throws java.io.IOException {
         if (Vartype_ != 0) {
@@ -1095,6 +1124,7 @@ public final class UmsgProtos {
         unknownFields.writeTo(output);
       }
 
+      @java.lang.Override
       public int getSerializedSize() {
         int size = memoizedSize;
         if (size != -1) return size;
@@ -1226,6 +1256,7 @@ public final class UmsgProtos {
             .parseWithIOException(PARSER, input, extensionRegistry);
       }
 
+      @java.lang.Override
       public Builder newBuilderForType() { return newBuilder(); }
       public static Builder newBuilder() {
         return DEFAULT_INSTANCE.toBuilder();
@@ -1233,6 +1264,7 @@ public final class UmsgProtos {
       public static Builder newBuilder(com.rubicom.vcf.UmsgProtos.Initial_msg.Prm prototype) {
         return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
       }
+      @java.lang.Override
       public Builder toBuilder() {
         return this == DEFAULT_INSTANCE
             ? new Builder() : new Builder().mergeFrom(this);
@@ -1256,6 +1288,7 @@ public final class UmsgProtos {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Prm_descriptor;
         }
 
+        @java.lang.Override
         protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
             internalGetFieldAccessorTable() {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Prm_fieldAccessorTable
@@ -1278,6 +1311,7 @@ public final class UmsgProtos {
                   .alwaysUseFieldBuilders) {
           }
         }
+        @java.lang.Override
         public Builder clear() {
           super.clear();
           Vartype_ = 0;
@@ -1289,15 +1323,18 @@ public final class UmsgProtos {
           return this;
         }
 
+        @java.lang.Override
         public com.google.protobuf.Descriptors.Descriptor
             getDescriptorForType() {
           return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_Prm_descriptor;
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Prm getDefaultInstanceForType() {
           return com.rubicom.vcf.UmsgProtos.Initial_msg.Prm.getDefaultInstance();
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Prm build() {
           com.rubicom.vcf.UmsgProtos.Initial_msg.Prm result = buildPartial();
           if (!result.isInitialized()) {
@@ -1306,6 +1343,7 @@ public final class UmsgProtos {
           return result;
         }
 
+        @java.lang.Override
         public com.rubicom.vcf.UmsgProtos.Initial_msg.Prm buildPartial() {
           com.rubicom.vcf.UmsgProtos.Initial_msg.Prm result = new com.rubicom.vcf.UmsgProtos.Initial_msg.Prm(this);
           result.Vartype_ = Vartype_;
@@ -1315,32 +1353,39 @@ public final class UmsgProtos {
           return result;
         }
 
+        @java.lang.Override
         public Builder clone() {
           return (Builder) super.clone();
         }
+        @java.lang.Override
         public Builder setField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             java.lang.Object value) {
           return (Builder) super.setField(field, value);
         }
+        @java.lang.Override
         public Builder clearField(
             com.google.protobuf.Descriptors.FieldDescriptor field) {
           return (Builder) super.clearField(field);
         }
+        @java.lang.Override
         public Builder clearOneof(
             com.google.protobuf.Descriptors.OneofDescriptor oneof) {
           return (Builder) super.clearOneof(oneof);
         }
+        @java.lang.Override
         public Builder setRepeatedField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             int index, java.lang.Object value) {
           return (Builder) super.setRepeatedField(field, index, value);
         }
+        @java.lang.Override
         public Builder addRepeatedField(
             com.google.protobuf.Descriptors.FieldDescriptor field,
             java.lang.Object value) {
           return (Builder) super.addRepeatedField(field, value);
         }
+        @java.lang.Override
         public Builder mergeFrom(com.google.protobuf.Message other) {
           if (other instanceof com.rubicom.vcf.UmsgProtos.Initial_msg.Prm) {
             return mergeFrom((com.rubicom.vcf.UmsgProtos.Initial_msg.Prm)other);
@@ -1366,10 +1411,12 @@ public final class UmsgProtos {
           return this;
         }
 
+        @java.lang.Override
         public final boolean isInitialized() {
           return true;
         }
 
+        @java.lang.Override
         public Builder mergeFrom(
             com.google.protobuf.CodedInputStream input,
             com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -1465,11 +1512,13 @@ public final class UmsgProtos {
           onChanged();
           return this;
         }
+        @java.lang.Override
         public final Builder setUnknownFields(
             final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.setUnknownFieldsProto3(unknownFields);
         }
 
+        @java.lang.Override
         public final Builder mergeUnknownFields(
             final com.google.protobuf.UnknownFieldSet unknownFields) {
           return super.mergeUnknownFields(unknownFields);
@@ -1491,6 +1540,7 @@ public final class UmsgProtos {
 
       private static final com.google.protobuf.Parser<Prm>
           PARSER = new com.google.protobuf.AbstractParser<Prm>() {
+        @java.lang.Override
         public Prm parsePartialFrom(
             com.google.protobuf.CodedInputStream input,
             com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -1508,6 +1558,7 @@ public final class UmsgProtos {
         return PARSER;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Initial_msg.Prm getDefaultInstanceForType() {
         return DEFAULT_INSTANCE;
       }
@@ -1656,6 +1707,7 @@ public final class UmsgProtos {
     }
 
     private byte memoizedIsInitialized = -1;
+    @java.lang.Override
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
       if (isInitialized == 1) return true;
@@ -1665,6 +1717,7 @@ public final class UmsgProtos {
       return true;
     }
 
+    @java.lang.Override
     public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       if (SeqNo_ != 0) {
@@ -1691,6 +1744,7 @@ public final class UmsgProtos {
       unknownFields.writeTo(output);
     }
 
+    @java.lang.Override
     public int getSerializedSize() {
       int size = memoizedSize;
       if (size != -1) return size;
@@ -1857,6 +1911,7 @@ public final class UmsgProtos {
           .parseWithIOException(PARSER, input, extensionRegistry);
     }
 
+    @java.lang.Override
     public Builder newBuilderForType() { return newBuilder(); }
     public static Builder newBuilder() {
       return DEFAULT_INSTANCE.toBuilder();
@@ -1864,6 +1919,7 @@ public final class UmsgProtos {
     public static Builder newBuilder(com.rubicom.vcf.UmsgProtos.Initial_msg prototype) {
       return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
     }
+    @java.lang.Override
     public Builder toBuilder() {
       return this == DEFAULT_INSTANCE
           ? new Builder() : new Builder().mergeFrom(this);
@@ -1887,6 +1943,7 @@ public final class UmsgProtos {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_descriptor;
       }
 
+      @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_fieldAccessorTable
@@ -1911,6 +1968,7 @@ public final class UmsgProtos {
           getPrmFieldBuilder();
         }
       }
+      @java.lang.Override
       public Builder clear() {
         super.clear();
         SeqNo_ = 0;
@@ -1938,15 +1996,18 @@ public final class UmsgProtos {
         return this;
       }
 
+      @java.lang.Override
       public com.google.protobuf.Descriptors.Descriptor
           getDescriptorForType() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Initial_msg_descriptor;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Initial_msg getDefaultInstanceForType() {
         return com.rubicom.vcf.UmsgProtos.Initial_msg.getDefaultInstance();
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Initial_msg build() {
         com.rubicom.vcf.UmsgProtos.Initial_msg result = buildPartial();
         if (!result.isInitialized()) {
@@ -1955,6 +2016,7 @@ public final class UmsgProtos {
         return result;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Initial_msg buildPartial() {
         com.rubicom.vcf.UmsgProtos.Initial_msg result = new com.rubicom.vcf.UmsgProtos.Initial_msg(this);
         int from_bitField0_ = bitField0_;
@@ -1987,32 +2049,39 @@ public final class UmsgProtos {
         return result;
       }
 
+      @java.lang.Override
       public Builder clone() {
         return (Builder) super.clone();
       }
+      @java.lang.Override
       public Builder setField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           java.lang.Object value) {
         return (Builder) super.setField(field, value);
       }
+      @java.lang.Override
       public Builder clearField(
           com.google.protobuf.Descriptors.FieldDescriptor field) {
         return (Builder) super.clearField(field);
       }
+      @java.lang.Override
       public Builder clearOneof(
           com.google.protobuf.Descriptors.OneofDescriptor oneof) {
         return (Builder) super.clearOneof(oneof);
       }
+      @java.lang.Override
       public Builder setRepeatedField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           int index, java.lang.Object value) {
         return (Builder) super.setRepeatedField(field, index, value);
       }
+      @java.lang.Override
       public Builder addRepeatedField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           java.lang.Object value) {
         return (Builder) super.addRepeatedField(field, value);
       }
+      @java.lang.Override
       public Builder mergeFrom(com.google.protobuf.Message other) {
         if (other instanceof com.rubicom.vcf.UmsgProtos.Initial_msg) {
           return mergeFrom((com.rubicom.vcf.UmsgProtos.Initial_msg)other);
@@ -2097,10 +2166,12 @@ public final class UmsgProtos {
         return this;
       }
 
+      @java.lang.Override
       public final boolean isInitialized() {
         return true;
       }
 
+      @java.lang.Override
       public Builder mergeFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -2772,11 +2843,13 @@ public final class UmsgProtos {
         onChanged();
         return this;
       }
+      @java.lang.Override
       public final Builder setUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.setUnknownFieldsProto3(unknownFields);
       }
 
+      @java.lang.Override
       public final Builder mergeUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.mergeUnknownFields(unknownFields);
@@ -2798,6 +2871,7 @@ public final class UmsgProtos {
 
     private static final com.google.protobuf.Parser<Initial_msg>
         PARSER = new com.google.protobuf.AbstractParser<Initial_msg>() {
+      @java.lang.Override
       public Initial_msg parsePartialFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -2815,6 +2889,7 @@ public final class UmsgProtos {
       return PARSER;
     }
 
+    @java.lang.Override
     public com.rubicom.vcf.UmsgProtos.Initial_msg getDefaultInstanceForType() {
       return DEFAULT_INSTANCE;
     }
@@ -2975,6 +3050,7 @@ public final class UmsgProtos {
       return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Operational_msg_descriptor;
     }
 
+    @java.lang.Override
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
       return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Operational_msg_fieldAccessorTable
@@ -3075,6 +3151,7 @@ public final class UmsgProtos {
     }
 
     private byte memoizedIsInitialized = -1;
+    @java.lang.Override
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
       if (isInitialized == 1) return true;
@@ -3084,6 +3161,7 @@ public final class UmsgProtos {
       return true;
     }
 
+    @java.lang.Override
     public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       if (SeqNo_ != 0) {
@@ -3110,6 +3188,7 @@ public final class UmsgProtos {
       unknownFields.writeTo(output);
     }
 
+    @java.lang.Override
     public int getSerializedSize() {
       int size = memoizedSize;
       if (size != -1) return size;
@@ -3272,6 +3351,7 @@ public final class UmsgProtos {
           .parseWithIOException(PARSER, input, extensionRegistry);
     }
 
+    @java.lang.Override
     public Builder newBuilderForType() { return newBuilder(); }
     public static Builder newBuilder() {
       return DEFAULT_INSTANCE.toBuilder();
@@ -3279,6 +3359,7 @@ public final class UmsgProtos {
     public static Builder newBuilder(com.rubicom.vcf.UmsgProtos.Operational_msg prototype) {
       return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
     }
+    @java.lang.Override
     public Builder toBuilder() {
       return this == DEFAULT_INSTANCE
           ? new Builder() : new Builder().mergeFrom(this);
@@ -3302,6 +3383,7 @@ public final class UmsgProtos {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Operational_msg_descriptor;
       }
 
+      @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Operational_msg_fieldAccessorTable
@@ -3324,6 +3406,7 @@ public final class UmsgProtos {
                 .alwaysUseFieldBuilders) {
         }
       }
+      @java.lang.Override
       public Builder clear() {
         super.clear();
         SeqNo_ = 0;
@@ -3343,15 +3426,18 @@ public final class UmsgProtos {
         return this;
       }
 
+      @java.lang.Override
       public com.google.protobuf.Descriptors.Descriptor
           getDescriptorForType() {
         return com.rubicom.vcf.UmsgProtos.internal_static_vcf_Operational_msg_descriptor;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Operational_msg getDefaultInstanceForType() {
         return com.rubicom.vcf.UmsgProtos.Operational_msg.getDefaultInstance();
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Operational_msg build() {
         com.rubicom.vcf.UmsgProtos.Operational_msg result = buildPartial();
         if (!result.isInitialized()) {
@@ -3360,6 +3446,7 @@ public final class UmsgProtos {
         return result;
       }
 
+      @java.lang.Override
       public com.rubicom.vcf.UmsgProtos.Operational_msg buildPartial() {
         com.rubicom.vcf.UmsgProtos.Operational_msg result = new com.rubicom.vcf.UmsgProtos.Operational_msg(this);
         result.SeqNo_ = SeqNo_;
@@ -3373,32 +3460,39 @@ public final class UmsgProtos {
         return result;
       }
 
+      @java.lang.Override
       public Builder clone() {
         return (Builder) super.clone();
       }
+      @java.lang.Override
       public Builder setField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           java.lang.Object value) {
         return (Builder) super.setField(field, value);
       }
+      @java.lang.Override
       public Builder clearField(
           com.google.protobuf.Descriptors.FieldDescriptor field) {
         return (Builder) super.clearField(field);
       }
+      @java.lang.Override
       public Builder clearOneof(
           com.google.protobuf.Descriptors.OneofDescriptor oneof) {
         return (Builder) super.clearOneof(oneof);
       }
+      @java.lang.Override
       public Builder setRepeatedField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           int index, java.lang.Object value) {
         return (Builder) super.setRepeatedField(field, index, value);
       }
+      @java.lang.Override
       public Builder addRepeatedField(
           com.google.protobuf.Descriptors.FieldDescriptor field,
           java.lang.Object value) {
         return (Builder) super.addRepeatedField(field, value);
       }
+      @java.lang.Override
       public Builder mergeFrom(com.google.protobuf.Message other) {
         if (other instanceof com.rubicom.vcf.UmsgProtos.Operational_msg) {
           return mergeFrom((com.rubicom.vcf.UmsgProtos.Operational_msg)other);
@@ -3437,10 +3531,12 @@ public final class UmsgProtos {
         return this;
       }
 
+      @java.lang.Override
       public final boolean isInitialized() {
         return true;
       }
 
+      @java.lang.Override
       public Builder mergeFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -3695,11 +3791,13 @@ public final class UmsgProtos {
         onChanged();
         return this;
       }
+      @java.lang.Override
       public final Builder setUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.setUnknownFieldsProto3(unknownFields);
       }
 
+      @java.lang.Override
       public final Builder mergeUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
         return super.mergeUnknownFields(unknownFields);
@@ -3721,6 +3819,7 @@ public final class UmsgProtos {
 
     private static final com.google.protobuf.Parser<Operational_msg>
         PARSER = new com.google.protobuf.AbstractParser<Operational_msg>() {
+      @java.lang.Override
       public Operational_msg parsePartialFrom(
           com.google.protobuf.CodedInputStream input,
           com.google.protobuf.ExtensionRegistryLite extensionRegistry)
@@ -3738,6 +3837,7 @@ public final class UmsgProtos {
       return PARSER;
     }
 
+    @java.lang.Override
     public com.rubicom.vcf.UmsgProtos.Operational_msg getDefaultInstanceForType() {
       return DEFAULT_INSTANCE;
     }
