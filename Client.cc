@@ -15,7 +15,10 @@
 using namespace google::protobuf::io;
 using namespace vcf;
 using namespace std;
-
+void myFlush()
+{
+    while(getchar() != '\n');
+}
 void readHdr(google::protobuf::uint32 hdr[], char *buf)
 {
     google::protobuf::io::ArrayInputStream ais(buf, 2);
@@ -233,6 +236,7 @@ int main(int argv, char **argc)
     int num=0;
     while (1)
     {
+        myFlush();
         ch = getchar();
         switch (ch)
         {
