@@ -204,7 +204,15 @@ enum
     MOTOR_RESET,  //7
     MOTOR_REGULAR_STOP,  //8
     MOTOR_EMERGENCY_STOP, //9
-    MOTOR_FINISH,
+    MOTOR_FINISH
+};
+enum
+{
+    PID_START,
+    PID_CALC,
+    PID_ACCEL,
+    PID_BRAKE,
+    PID_FINISH
 };
 enum
 {

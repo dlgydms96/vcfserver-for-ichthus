@@ -201,6 +201,16 @@ void motor_on();
 void motor_ready();
 void motor_auto();
 void HA_EcatCyclicThread();
+class PID_CALC2ACCEL :public Condition
+{
+  public:
+  bool check(HybridAutomata *HA);
+};
+class PID_CALC2BRAKE :public Condition
+{
+  public:
+  bool check(HybridAutomata *HA);
+};
 class MOTOR_ALL2ERROR : public Condition
 {
 public:
