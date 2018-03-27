@@ -33,6 +33,8 @@ typedef struct _obd_ {
 extern int nobd2_var;
 extern pthread_mutex_t glob_mutex;
 
+extern Var obd2_var[OBD2_MAX];
+
 void obd2_up();
 void obd2_on();
 void *obd_cyclic(void *name);

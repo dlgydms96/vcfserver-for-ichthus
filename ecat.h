@@ -185,6 +185,8 @@ enum
   X
 };
 
+extern Var obd2_var[OBD2_MAX];
+extern Var ecat_var[ECAT_MAX];
 void ecat_up();
 void ecat_on();
 void ecat_off();

@@ -26,3 +26,6 @@
 using namespace std;
 using namespace vcf;
 using namespace google::protobuf::io;
+
+extern Var obd2_var[OBD2_MAX];
+extern Var ecat_var[ECAT_MAX];

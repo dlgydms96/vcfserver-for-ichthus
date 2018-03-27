@@ -1,181 +1,16 @@
 #pragma once
-struct OBD2_CurrentVelocity
+#define ECAT_MAX ECAT_MOTOR_STATE+1
+#define OBD2_MAX OBD2_STATE+1
+typedef struct variables
 {
-    const char *name = "current velocity";
-    const unsigned int varID = 101;
-    int value = 0;
-    int timestamp = 0;
-    const unsigned int version = 0;
-};
-
-struct OBD2_STATE
-{
-    const char *name = "obd_state";
-    const unsigned int varID = 110;
-    int value = 0;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 3;
-    const unsigned int version = 0;
-};
-struct ECAT_kpt
-{
-    const char *name = "kpt";
-    const unsigned int varID = 1;
-    int value = 600;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_kit
-{
-    const char *name = "kit";
-    const unsigned int varID = 2;
-    int value = 25;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_kdt
-{
-    const char *name = "kdt";
-    const unsigned int varID = 3;
-    int value = 300;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_kpb
-{
-    const char *name = "kpb";
-    const unsigned int varID = 4;
-    int value = 3000;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 4000;
-    const unsigned int version = 0;
-};
-struct ECAT_kib
-{
-    const char *name = "kib";
-    const unsigned int varID = 5;
-    int value = 250;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_kdb
-{
-    const char *name = "kdb";
-    const unsigned int varID = 6;
-    int value = 2000;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 3000;
-    const unsigned int version = 0;
-};
-struct ECAT_SteeringPosition
-{
-    const char *name = "spos";
-    const unsigned int varID = 9;
-    int value = 0;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 500000;
-    const unsigned int version = 0;
-};
-struct ECAT_cycle
-{
-    const char *name = "cycle";
-    const unsigned int varID = 22;
-    int value = 5;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_stair
-{
-    const char *name = "stair";
-    const unsigned int varID = 23;
-    int value = 3;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-struct ECAT_veldiff
-{
-    const char *name = "vel_diff";
-    const unsigned int varID = 24;
-    int value = 3;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 1000;
-    const unsigned int version = 0;
-};
-
-struct ECAT_TargetVelocity
-{
-    const char *name = "tvel";
-    const unsigned int varID = 7;
-    int value = 0;
-    int timestamp = 0;
-    const unsigned int min = 0;
-    const unsigned int max = 30;
-    const unsigned int version = 0;
-};
-
-struct ECAT_STATE
-{
-    const char *name = "EtherCAT_State";
-    const unsigned int varID = 27;
-    int value = 0;
-    int timestamp = 0;
-    const unsigned int min = 1;
-    const unsigned int max = 4;
-    const unsigned int version = 0;
-};
-struct ECAT_Motor_STATE
-{
-    const char *name = "Motor_State";
-    const unsigned int varID = 28;
-    int value = 0;
-    int before_value = 0;
-    int timestamp = 0;
-    const unsigned int min = 7;
-    const unsigned int max = 9;
-    const unsigned int version = 0;
-};
-
-struct ECAT
-{
-    struct ECAT_kpt kpt;
-    struct ECAT_kit kit;
-    struct ECAT_kdt kdt;
-    struct ECAT_kpb kpb;
-    struct ECAT_kib kib;
-    struct ECAT_kdb kdb;
-    struct ECAT_SteeringPosition spos;
-    struct ECAT_cycle cycle;
-    struct ECAT_stair stair;
-    struct ECAT_veldiff vel_diff; //23
-    struct ECAT_TargetVelocity tvel; //6
-    struct ECAT_STATE ecat_state;
-    struct ECAT_Motor_STATE motor_state;
-};
-struct OBD2
-{
-    struct OBD2_CurrentVelocity vel;
-    struct OBD2_STATE obd2_state;
-};
-
-extern struct ECAT ecat_var;
-extern struct OBD2 obd2_var;
+    const char *name;
+    const unsigned int varID;
+    int value;
+    int timestamp;
+    const unsigned int min;
+    const unsigned int max;
+    const unsigned int version;
+} Var;
 
 enum
 {
@@ -223,4 +58,24 @@ enum
     OBD2_DOWN,
     OBD2_FINISH
 };
-//enum {NON, GET, SET};
+enum
+{
+    OBD2_VEL,
+    OBD2_STATE
+};
+enum
+{
+    ECAT_KPT,
+    ECAT_KIT,
+    ECAT_KDT,
+    ECAT_KPB,
+    ECAT_KIB,
+    ECAT_KDB,
+    ECAT_SPOS,
+    ECAT_CYCLE,
+    ECAT_STAIR,
+    ECAT_VEL_DIFF,
+    ECAT_TVEL,
+    ECAT_STATE,
+    ECAT_MOTOR_STATE
+};

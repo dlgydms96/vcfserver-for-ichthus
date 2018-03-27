@@ -1,4 +1,5 @@
 #include "obd2.h"
+// extern Var obd2_var[];
 
 char *AT_RESET = "AT Z\r";
 char *AT_SP = "AT SP 0\r";
@@ -119,9 +120,9 @@ void *obd_cyclic(void *name)
       }
       change_buf[j] = '\0';
       sscanf(change_buf, "%x", &obd.vel);
-      obd2_var.vel.value = obd.vel;
-      printf("obd2 vel : %d\n",obd.vel);
-      obd2_var.vel.timestamp++;
+      obd2_var[OBD2_VEL].value = obd.vel;
+      //printf("obd2 vel : %d obd2 timestamp : %d\n",obd.vel, obd2_var.vel.timestamp++);
+      obd2_var[OBD2_VEL].timestamp++;
       sprintf(buf, "Vel from OBD : %d\n", obd.vel);
       write(obd_log_fd, buf, strlen(buf));
     }

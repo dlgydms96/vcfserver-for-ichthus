@@ -6,8 +6,6 @@
 #define MAX_BUFFER 1024
 #define MAX_NAME 20
 
-struct ECAT ecat_var;
-struct OBD2 obd2_var;
 
 int connect_start = 1;
 int nclients = 0;
@@ -365,7 +363,7 @@ class ECAT_UP2ON : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_ON) && (HA->curState == ECAT_UP))
+    if ((ecat_var[ECAT_STATE].value == ECAT_ON) && (HA->curState == ECAT_UP))
       return true;
     else
       return false;
@@ -376,7 +374,7 @@ class ECAT_ON2OFF : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_OFF) && (HA->curState == ECAT_ON))
+    if ((ecat_var[ECAT_STATE].value == ECAT_OFF) && (HA->curState == ECAT_ON))
       return true;
     else
       return false;
@@ -387,7 +385,7 @@ class ECAT_OFF2DOWN : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_DOWN) && (HA->curState == ECAT_OFF))
+    if ((ecat_var[ECAT_STATE].value == ECAT_DOWN) && (HA->curState == ECAT_OFF))
       return true;
     else
       return false;
@@ -398,7 +396,7 @@ class ECAT_OFF2ON : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_ON) && (HA->curState == ECAT_OFF))
+    if ((ecat_var[ECAT_STATE].value == ECAT_ON) && (HA->curState == ECAT_OFF))
       return true;
     else
       return false;
@@ -409,7 +407,7 @@ class ECAT_ON2DOWN : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_DOWN) && (HA->curState == ECAT_ON))
+    if ((ecat_var[ECAT_STATE].value == ECAT_DOWN) && (HA->curState == ECAT_ON))
       return true;
     else
       return false;
@@ -420,7 +418,7 @@ class ECAT_DOWN2UP : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((ecat_var.ecat_state.value == ECAT_UP) && (HA->curState == ECAT_DOWN))
+    if ((ecat_var[ECAT_STATE].value == ECAT_UP) && (HA->curState == ECAT_DOWN))
       return true;
     else
       return false;
@@ -455,7 +453,7 @@ class OBD2_UP2ON : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((obd2_var.obd2_state.value == OBD2_ON) && (HA->curState == OBD2_UP))
+    if ((obd2_var[OBD2_STATE].value == OBD2_ON) && (HA->curState == OBD2_UP))
     {
       cout << "OBD2_UP2ON" << endl;
       return true;
@@ -470,7 +468,7 @@ class OBD2_ON2OFF : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((obd2_var.obd2_state.value == OBD2_OFF) && (HA->curState == OBD2_ON))
+    if ((obd2_var[OBD2_STATE].value == OBD2_OFF) && (HA->curState == OBD2_ON))
     {
       cout << "OBD2_ON2OFF" << endl;
       return true;
@@ -484,7 +482,7 @@ class OBD2_OFF2ON : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((obd2_var.obd2_state.value == OBD2_ON) && (HA->curState == OBD2_OFF))
+    if ((obd2_var[OBD2_STATE].value == OBD2_ON) && (HA->curState == OBD2_OFF))
     {
       cout << "OBD2_OFF2ON" << endl;
       return true;
@@ -498,7 +496,7 @@ class OBD2_OFF2DOWN : public Condition
 public:
   bool check(HybridAutomata *HA)
   {
-    if ((obd2_var.obd2_state.value == OBD2_DOWN) && (HA->curState == OBD2_OFF))
+    if ((obd2_var[OBD2_STATE].value == OBD2_DOWN) && (HA->curState == OBD2_OFF))
     {
       cout << "OBD2_OFF2DOWN" << endl;
       return true;
@@ -537,16 +535,21 @@ void ecat_handler(VThread *t, ThreadMsg *msg)
 {
   cout << "in ecat_handler start!" << endl;
   const Operational_msg *oper_msg = static_cast<const Operational_msg *>(msg->msg);
-  if ((oper_msg->_varid()) == (ecat_var.ecat_state.varID))
+  if ((oper_msg->_varid()) == (ecat_var[ECAT_STATE].varID))
   {
     cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-    ecat_var.ecat_state.value = oper_msg->_value();
+    ecat_var[ECAT_STATE].value = oper_msg->_value();
     HA_ecatmgr->operate();
   }
-  else if((oper_msg->_varid()) == (ecat_var.motor_state.varID))
+  else if((oper_msg->_varid()) == (ecat_var[ECAT_MOTOR_STATE].varID))
   {
-    ecat_var.motor_state.value = oper_msg->_value();
-    cout<< "ecat_var.motor_state.value " << ecat_var.motor_state.value << endl;
+    ecat_var[ECAT_MOTOR_STATE].value = oper_msg->_value();
+    cout<< "ecat_var[ECAT_MOTOR_STATE].value " << ecat_var[ECAT_MOTOR_STATE].value << endl;
+  }
+  else if((oper_msg->_varid()) == (ecat_var[ECAT_TVEL].varID))
+  {
+    ecat_var[ECAT_TVEL].value = oper_msg->_value();
+    cout<< "ecat_var.tvel.value " << ecat_var[ECAT_TVEL].value << endl;
   }
 }
 
@@ -554,10 +557,10 @@ void obd2_handler(VThread *t, ThreadMsg *msg)
 {
     cout << "in obd2_handler start!" << endl;
     const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
-    if((oper_msg->_varid()) == (obd2_var.obd2_state.varID))
+    if((oper_msg->_varid()) == (obd2_var[OBD2_STATE].varID))
     {
       cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-      obd2_var.obd2_state.value = oper_msg->_value();
+      obd2_var[OBD2_STATE].value = oper_msg->_value();
       HA_obd2mgr->operate();
     }
 }
