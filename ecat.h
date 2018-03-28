@@ -1,4 +1,11 @@
 #pragma once
+//check list 0328 in SNU
+/*//////////////////////
+pullover brake_start_pos = 5000?
+pid_calc || pid_calc2 ?
+
+
+//////////////////////*/
 
 #include "global.h"
 #include "ecrt.h"

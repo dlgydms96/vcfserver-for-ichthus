@@ -350,7 +350,7 @@ void *recv_thread(void *arg)
     {
       printf("unknown type\n");
     }
-    printf("recv end\n");
+    printf("recv end\n###############################################\n");
   }
 }
 /////////////////////////////////////////////////////
@@ -533,24 +533,35 @@ void HA_Obd2MgrThread()
 
 void ecat_handler(VThread *t, ThreadMsg *msg)
 {
-  cout << "in ecat_handler start!" << endl;
+  cout << "***************in ecat_handler start!**************" << endl;
   const Operational_msg *oper_msg = static_cast<const Operational_msg *>(msg->msg);
+  int i;
   if ((oper_msg->_varid()) == (ecat_var[ECAT_STATE].varID))
   {
     cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
     ecat_var[ECAT_STATE].value = oper_msg->_value();
     HA_ecatmgr->operate();
   }
-  else if((oper_msg->_varid()) == (ecat_var[ECAT_MOTOR_STATE].varID))
+  else if ((oper_msg->_varid()) == (ecat_var[ECAT_MOTOR_STATE].varID))
   {
+    cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
     ecat_var[ECAT_MOTOR_STATE].value = oper_msg->_value();
-    cout<< "ecat_var[ECAT_MOTOR_STATE].value " << ecat_var[ECAT_MOTOR_STATE].value << endl;
   }
-  else if((oper_msg->_varid()) == (ecat_var[ECAT_TVEL].varID))
+  else
   {
-    ecat_var[ECAT_TVEL].value = oper_msg->_value();
-    cout<< "ecat_var.tvel.value " << ecat_var[ECAT_TVEL].value << endl;
+    for (i = 0; i < ECAT_MAX; i++)
+    {
+      if (oper_msg->_varid() == ecat_var[i].varID)
+      {
+        cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
+        ecat_var[i].value = oper_msg->_value();
+        break;
+      }
+    }
+    if(i==ECAT_MAX-1)
+    cout<<"unknown ecat_var id"<<endl;
   }
+  cout << "*****************************************************" <<endl;
 }
 
 void obd2_handler(VThread *t, ThreadMsg *msg)

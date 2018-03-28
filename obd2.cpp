@@ -84,7 +84,7 @@ void *obd_cyclic(void *name)
   char CARRIAGE_RETURN[] = "\r";
   obd.state = OBD_ON;
 
-  obd_log_fd = open("obd_log.txt", O_CREAT | O_RDWR | O_APPEND, 0666);
+  obd_log_fd = open("obd_log1.txt", O_CREAT | O_RDWR | O_APPEND, 0666);
   if (obd_log_fd < 0)
   {
     printf("OBD Log Err\n");
@@ -121,9 +121,9 @@ void *obd_cyclic(void *name)
       change_buf[j] = '\0';
       sscanf(change_buf, "%x", &obd.vel);
       obd2_var[OBD2_VEL].value = obd.vel;
-      //printf("obd2 vel : %d obd2 timestamp : %d\n",obd.vel, obd2_var.vel.timestamp++);
+      printf("obd2 vel : %d\n",obd2_var[OBD2_VEL].value);
       obd2_var[OBD2_VEL].timestamp++;
-      sprintf(buf, "Vel from OBD : %d\n", obd.vel);
+      sprintf(buf, "%d\n", obd.vel);
       write(obd_log_fd, buf, strlen(buf));
     }
     else
