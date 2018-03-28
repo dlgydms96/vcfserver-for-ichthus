@@ -391,7 +391,7 @@ void pid_calc() // not using int maintain1
   static int tvel = ecat_var[ECAT_TVEL].value;               //
   int vel_from_obd = obd2_var[OBD2_VEL].value;               //
   static int prev_vel_from_obd = 0;                    //
-  static int pedal_state = ACCELERATOR;                //
+  //static int pedal_state = ACCELERATOR;                //
   static int maintain = 0;                             //
   static int vel_diff = 0;                             //
   static int vel_diff_count = ecat_var[ECAT_VEL_DIFF].value; //
@@ -625,7 +625,7 @@ void pid_calc2()
   static int tvel = ecat_var[ECAT_TVEL].value;
   int vel_from_obd = obd2_var[OBD2_VEL].value;
   static int prev_vel_from_obd = 0;
-  static int pedal_state = ACCELERATOR;
+  //static int pedal_state = ACCELERATOR;
   static int maintain = 0;
   static int maintain1 = 0;
   static int vel_diff = 0;
@@ -653,67 +653,8 @@ void pid_calc2()
     act_tvel = ecat_var[ECAT_TVEL].value;
     tvel = act_tvel;
     //++ecat_var[ECAT_TVEL].timestampE;
-    switch (stair)
-    {
-    case 0:
-      maintain = 0;
-      break;
-    case 1:
-      if (pedal_state == ACCELERATOR)
-      {
-        if (vel_from_obd > tvel)
-        {
-          maintain = 1;
-        }
-        else
-        {
-          vel_diff = 0;
-          maintain = 0;
-        }
-      }
-      else
-      {
-        if (vel_from_obd < tvel)
-        {
-          maintain = 1;
-        }
-        else
-        {
-          vel_diff = 0;
-          maintain = 0;
-        }
-      }
-      break;
-    case 2:
-      if (pedal_state == ACCELERATOR)
-      {
-        if (vel_from_obd < tvel)
-        {
-          maintain = 1;
-        }
-        else
-        {
-          vel_diff = 0;
-          maintain = 0;
-        }
-      }
-      else
-      {
-        if (vel_from_obd > tvel)
-        {
-          maintain = 1;
-        }
-        else
-        {
-          vel_diff = 0;
-          maintain = 0;
-        }
-      }
-      break;
-    case 3:
-      maintain = 1;
-      break;
-    }// end of switch
+  
+    maintain = 1;
 
     act_tvel = tvel;
     maintain1 = 1;
@@ -966,8 +907,8 @@ bool PID_CALC2BRAKE::check(HybridAutomata *HA)
 }
 void pid_accel()
 {
-  cout<<"in pid_accel" <<endl;
-  cout<<"in pid_accel, ecat_var.vel : "<<ecat_var[ECAT_TVEL].value<<endl;
+  //cout<<"in pid_accel" <<endl;
+  //cout<<"in pid_accel, ecat_var.vel : "<<ecat_var[ECAT_TVEL].value<<endl;
   ++acc_count;
   motor_info[ACCEL_SLAVE].target_pos = power;
   motor_info[BRAKE_SLAVE].target_pos = 0;
@@ -979,11 +920,11 @@ void pid_accel()
   {
     motor_info[ACCEL_SLAVE].target_pos = 0;
   }
-  cout<< "in pid_accel power : "<<motor_info[ACCEL_SLAVE].target_pos<<endl;
+  cout<< "[in pid_accel] power : "<<motor_info[ACCEL_SLAVE].target_pos<<endl;
 }
 void pid_brake()
 {
-  cout<<"in pid_brake" <<endl;
+  //cout<<"in pid_brake" <<endl;
   ++dec_count;
   motor_info[ACCEL_SLAVE].target_pos = 0;
   motor_info[BRAKE_SLAVE].target_pos = -power;
@@ -995,6 +936,7 @@ void pid_brake()
   {
     motor_info[BRAKE_SLAVE].target_pos = 0;
   }
+  cout<< "[in pid_brake] power : "<<motor_info[BRAKE_SLAVE].target_pos<<endl;
 }
 void pid_finish()
 {
@@ -1545,7 +1487,7 @@ void motor_auto()
 void motor_pid()
 {
   //cout << "\t\tmotor_pid" << endl;
-  pedal_state = ACCELERATOR;
+  
   while (1)
   {
     //HA_pidcontrol->curState=0;
