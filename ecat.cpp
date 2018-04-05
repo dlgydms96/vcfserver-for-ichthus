@@ -1410,7 +1410,7 @@ bool MOTOR_ON2READY::check(HybridAutomata *HA)
 
   return false;
 }
-bool MOTOR_READY2AUTO::check(HybridAutomata *HA)
+bool MOTOR_READY2AUTO::check(HybridAutomata *HA)//need to change that when tvel came
 {
   if (HA->curState == MOTOR_READY)
   {
