@@ -18,8 +18,8 @@ protoc_middleman: umsg.proto
 	protoc -I=. --cpp_out=. --java_out=. ./umsg.proto
 	@touch protoc_middleman
 
-VCFServer_cpp.exe: ecat.o myVCFServ.o HybridAutomata.o umsg.pb.o obd2.o global.o 
-	$(GG) -o $@ $^ $(CFLAGS) /opt/etherlab/lib/libethercat.a $(LDFLAGS) $(PROTO_FLAGS)
+VCFServer_cpp.exe:  myVCFServ.o HybridAutomata.o umsg.pb.o global.o 
+	$(GG) -o $@ $^ $(CFLAGS)  $(LDFLAGS) $(PROTO_FLAGS)
 
 Client_cpp.exe: Client.o
 	$(CC) $^ umsg.pb.cc -o  $@ $(PROTO_FLAGS)

@@ -1,6 +1,6 @@
 #include "myVCFServ.h"
 
-#define SERVER_IPADDR "127.0.0.1"
+#define SERVER_IPADDR "192.168.0.4"
 #define SERVER_PORTNO 9000
 #define MAX_CLIENTS 1
 #define MAX_BUFFER 1024
@@ -118,28 +118,12 @@ void shutdown()
     ++idx;
   }
   idx = 0;
-  /*  ecat_var[15].value = 0;
-  ecat_var[14].value = 0;
-  connect_start = 1;
-  if(ecat_var[necat_var - 1].value != 3) {
-    ecat_off();
-    ecat_down();
-  }
-  if(obd2_var[nobd2_var - 1].value != 3) {
-    obd_off();
-    obd_down();
-  }
-  ecat_thread->ExitThread();
-  obd2_thread->ExitThread();
-  delete ecat_thread; ecat_thread = NULL;
-  delete obd2_thread; obd2_thread = NULL;
- */
   while (idx < MAX_CLIENTS)
   {
     if (clients[idx].sockfd >= 0)
     {
       delete_client(idx);
-      send_thread[idx]->ExitThread();
+	  send_thread[idx]->ExitThread();
       delete send_thread[idx];
       send_thread[idx] = NULL;
     }
@@ -313,7 +297,7 @@ void *recv_thread(void *arg)
 
     readHdr(hdr, buffer);
 
-    if (hdr[0] == 1)
+    if (hdr[0] == 3)
     {
       Operational_msg *umsg;
       printf("#############It's Operational_msg################\n\t");
@@ -330,20 +314,40 @@ void *recv_thread(void *arg)
       }
 
       umsg->set__result(2);
-      printf("\tbefor PostOperationalMsg\n client_idx = %d\n", client_idx);
-      //        send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
+      printf("\tbefore PostOperationalMsg\n client_idx = %d\n", client_idx);
+      send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
     }
 
+	else if ((hdr[0] == 1) || (hdr[0] == 2))
+	{
+      Operational_msg *umsg;
+      printf("#############It's Operational_msg################\n\t");
+      printf("\tin recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
+      umsg = operational_ReadBody(clients[client_idx].sockfd, hdr);
+      switch (umsg->_to())
+      {
+      case ECAT:
+        ecat_thread->PostOperationalMsg((const Operational_msg *)umsg);
+        break;
+      case OBD2 :
+        obd2_thread->PostOperationalMsg((const Operational_msg *) umsg);
+        break;
+      }
+
+      umsg->set__result(2);
+      printf("\tbefor PostOperationalMsg\n client_idx = %d\n", client_idx);
+//      send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
+ }
     else if (hdr[0] == 0)
     {
       Initial_msg *umsg;
       printf("#############It's Initial_msg################\n\t");
       printf("in recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
       umsg = initial_ReadBody(clients[client_idx].sockfd, hdr);
-      //          init_thread->PostInitialMsg((const Initial_msg *) umsg);
+      init_thread->PostInitialMsg((const Initial_msg *) umsg);
 
       umsg->set__result(2);
-      //        send_thread[client_idx]->PostInitialMsg((const Initial_msg *) umsg);
+      send_thread[client_idx]->PostInitialMsg((const Initial_msg *) umsg);
     }
 
     else
@@ -352,179 +356,6 @@ void *recv_thread(void *arg)
     }
     printf("recv end\n###############################################\n");
   }
-}
-/////////////////////////////////////////////////////
-// about HybridAutomata
-////////////////////////////////////////////////////
-
-HybridAutomata *HA_ecatmgr;
-class ECAT_UP2ON : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_ON) && (HA->curState == ECAT_UP))
-      return true;
-    else
-      return false;
-  }
-};
-class ECAT_ON2OFF : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_OFF) && (HA->curState == ECAT_ON))
-      return true;
-    else
-      return false;
-  }
-};
-class ECAT_OFF2DOWN : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_DOWN) && (HA->curState == ECAT_OFF))
-      return true;
-    else
-      return false;
-  }
-};
-class ECAT_OFF2ON : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_ON) && (HA->curState == ECAT_OFF))
-      return true;
-    else
-      return false;
-  }
-};
-class ECAT_ON2DOWN : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_DOWN) && (HA->curState == ECAT_ON))
-      return true;
-    else
-      return false;
-  }
-};
-class ECAT_DOWN2UP : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((ecat_var[ECAT_STATE].value == ECAT_UP) && (HA->curState == ECAT_DOWN))
-      return true;
-    else
-      return false;
-  }
-};
-void HA_EcatMgrThread()
-{
-  cout << "in HA_EcatMgrThread func()" << endl;
-  ECAT_UP2ON *ECAT_up2on = new ECAT_UP2ON();
-  ECAT_ON2OFF *ECAT_on2off = new ECAT_ON2OFF();
-  ECAT_OFF2DOWN *ECAT_off2down = new ECAT_OFF2DOWN();
-  ECAT_OFF2ON *ECAT_off2on = new ECAT_OFF2ON();
-  ECAT_ON2DOWN *ECAT_on2down = new ECAT_ON2DOWN();
-  ECAT_DOWN2UP *ECAT_down2up = new ECAT_DOWN2UP();
-
-  HA_ecatmgr = new HybridAutomata(ECAT_START, ECAT_FINISH);
-  HA_ecatmgr->setState(ECAT_UP, ecat_up);
-  HA_ecatmgr->setState(ECAT_ON, ecat_on);
-  HA_ecatmgr->setState(ECAT_OFF, ecat_off);
-  HA_ecatmgr->setState(ECAT_DOWN, ecat_down);
-  HA_ecatmgr->setCondition(ECAT_START, NULL, ECAT_UP);
-  HA_ecatmgr->setCondition(ECAT_UP, ECAT_up2on, ECAT_ON);
-  HA_ecatmgr->setCondition(ECAT_ON, ECAT_on2off, ECAT_OFF);
-  HA_ecatmgr->setCondition(ECAT_OFF, ECAT_off2down, ECAT_DOWN);
-  HA_ecatmgr->setCondition(ECAT_DOWN, NULL, ECAT_FINISH);
-  HA_ecatmgr->setCondition(ECAT_DOWN, ECAT_down2up, ECAT_UP);
-  HA_ecatmgr->setCondition(ECAT_OFF, ECAT_off2on, ECAT_ON);
-  HA_ecatmgr->setCondition(ECAT_ON, ECAT_on2down, ECAT_DOWN);
-}
-class OBD2_UP2ON : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((obd2_var[OBD2_STATE].value == OBD2_ON) && (HA->curState == OBD2_UP))
-    {
-      cout << "OBD2_UP2ON" << endl;
-      return true;
-    }
-
-    else
-      return false;
-  }
-};
-class OBD2_ON2OFF : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((obd2_var[OBD2_STATE].value == OBD2_OFF) && (HA->curState == OBD2_ON))
-    {
-      cout << "OBD2_ON2OFF" << endl;
-      return true;
-    }
-    else
-      return false;
-  }
-};
-class OBD2_OFF2ON : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((obd2_var[OBD2_STATE].value == OBD2_ON) && (HA->curState == OBD2_OFF))
-    {
-      cout << "OBD2_OFF2ON" << endl;
-      return true;
-    }
-    else
-      return false;
-  }
-};
-class OBD2_OFF2DOWN : public Condition
-{
-public:
-  bool check(HybridAutomata *HA)
-  {
-    if ((obd2_var[OBD2_STATE].value == OBD2_DOWN) && (HA->curState == OBD2_OFF))
-    {
-      cout << "OBD2_OFF2DOWN" << endl;
-      return true;
-    }
-    else
-      return false;
-  }
-};
-HybridAutomata *HA_obd2mgr;
-void HA_Obd2MgrThread()
-{
-  cout << "in HA_Obd2MgrThread func()" << endl;
-  OBD2_UP2ON *obd2_up2on = new OBD2_UP2ON();
-  OBD2_ON2OFF *obd2_on2off = new OBD2_ON2OFF();
-  OBD2_OFF2ON *obd2_off2on = new OBD2_OFF2ON();
-  OBD2_OFF2DOWN *obd2_off2down = new OBD2_OFF2DOWN();
-
-  HA_obd2mgr = new HybridAutomata(OBD2_START, OBD2_FINISH);
-  HA_obd2mgr->setState(OBD2_UP, obd2_up);
-  HA_obd2mgr->setState(OBD2_ON, obd2_on);
-  HA_obd2mgr->setState(OBD2_OFF, obd2_off);
-  HA_obd2mgr->setState(OBD2_DOWN, obd2_down);
-  HA_obd2mgr->setCondition(OBD2_START,NULL,OBD2_UP);
-  HA_obd2mgr->setCondition(OBD2_UP,  obd2_up2on ,  OBD2_ON);
-  HA_obd2mgr->setCondition(OBD2_ON,  obd2_on2off,  OBD2_OFF);
-  HA_obd2mgr->setCondition(OBD2_OFF, obd2_off2on,  OBD2_ON);
-  HA_obd2mgr->setCondition(OBD2_OFF, obd2_off2down,OBD2_DOWN);
-  //HA_obd2mgr->setCondition(,,);
 }
 
 /////////////////////////////////////////////////////
@@ -540,7 +371,6 @@ void ecat_handler(VThread *t, ThreadMsg *msg)
   {
     cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
     ecat_var[ECAT_STATE].value = oper_msg->_value();
-    HA_ecatmgr->operate();
   }
   else if ((oper_msg->_varid()) == (ecat_var[ECAT_MOTOR_STATE].varID))
   {
@@ -572,7 +402,6 @@ void obd2_handler(VThread *t, ThreadMsg *msg)
     {
       cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
       obd2_var[OBD2_STATE].value = oper_msg->_value();
-      HA_obd2mgr->operate();
     }
 }
 
@@ -590,6 +419,7 @@ void send_handler(VThread *t, ThreadMsg *msg)
   switch (msg_type)
   {
   case 1:
+  case 3:
   {
     const Operational_msg *oper_msg = static_cast<const Operational_msg *>(msg->msg);
     cout << "\tsize after serilizing is " << oper_msg->ByteSize() << endl;
@@ -599,9 +429,7 @@ void send_handler(VThread *t, ThreadMsg *msg)
     CodedOutputStream *coded_output = new CodedOutputStream(&aos);
     coded_output->WriteVarint32(msg_type);
     coded_output->WriteVarint32(siz);
-    cout << "where????" << endl;
     oper_msg->SerializeToCodedStream(coded_output);
-    cout << "where?" << endl;
     cout << "\tin send_handler -> oper Message is \n"
          << oper_msg->DebugString() << endl;
     break;
@@ -642,6 +470,15 @@ void send_handler(VThread *t, ThreadMsg *msg)
   }
 }
 
+void init_handler(VThread *t, ThreadMsg *msg)
+{
+	while(1)
+	{
+	  const Initial_msg *umsg = static_cast<const Initial_msg *>(msg->msg);
+	  umsg->set__result(2);
+      send_thread[nclients]->PostInitialMsg((const Initial_msg *) umsg);
+	}
+}
 ///////////////////////////////////////////////
 // main function
 ///////////////////////////////////////////////
@@ -751,15 +588,15 @@ int main(int argc, char *argv[])
     if (connect_start)
     {
       // create the following threads only once --> move the following code outside the while loop
-      /*	init_thread = new VThread("init_thread", init_handler, exit_handler);
-        init_thread->CreateThread();
-      */
-      HA_Obd2MgrThread();
+      init_thread = new VThread("init_thread", init_handler, exit_handler);
+      init_thread->CreateThread();
+      
+      //HA_Obd2MgrThread();
       obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
     	obd2_thread->CreateThread();
    
-      HA_EcatMgrThread();
-      HA_EcatCyclicThread();
+      //HA_EcatMgrThread();
+      //HA_EcatCyclicThread();
       ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
       ecat_thread->CreateThread();
       connect_start = 0;

@@ -147,7 +147,7 @@ void VThread::PostOperationalMsg(const Operational_msg* data)
 {
   ASSERT_TRUE(m_thread);
 
-  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Operational_MSG,1, data);
+  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Operational_MSG,3, data);
 
   // Add user data msg to queue and notify worker thread
   std::unique_lock<std::mutex> lk(m_mutex);

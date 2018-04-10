@@ -12,8 +12,8 @@
 #include <pthread.h>
 
 #include "VThread.h"
-#include "ecat.h"
-#include "obd2.h"
+//#include "ecat.h"
+//#include "obd2.h"
 #include "global.h"
 #include "HybridAutomata.h"
 

@@ -193,7 +193,7 @@ int main(int argv, char **argc)
    
 
     int host_port = 9000;
-    char *host_name = "127.0.0.1";
+    char *host_name = "192.168.0.4";
 
     struct sockaddr_in my_addr;
     char buffer[1024];

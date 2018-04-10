@@ -21,5 +21,5 @@ Var ecat_var[]=
     {"vel_diff",         24,    3,      0,     0,   1000,       0},
     {"tvel",              7,    0,      0,     0,     30,       0},
     {"EtherCAT_State",   27,    0,      0,     1,      4,       0},
-    {"Motor_State",      28,    0,      0,     7,      9,       0},
+    {"Motor_State",      28,    0,      0,     5,      9,       0},
 };
