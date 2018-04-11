@@ -107,12 +107,16 @@ void shutdown()
   {
     if (recv_thread_id[idx] != 0)
     {
-      pthread_cancel(recv_thread_id[idx]);
-      pthread_join(recv_thread_id[idx], (void **)&retval);
-      if (retval == PTHREAD_CANCELED)
-        cout << "recv_thread canceled" << endl;
+	  pthread_cancel(recv_thread_id[idx]);
+      pthread_join(recv_thread_id[idx], (void **)retval);
+  	  if (retval == PTHREAD_CANCELED)
+	  {
+     	cout << "recv_thread canceled" << endl;
+	  }
       else
-        cout << "recv_thread cancellation failed" << endl;
+	  {
+    	cout << "recv_thread cancellation failed" << endl;
+	  }
       recv_thread_id[idx] = 0;
     }
     ++idx;
@@ -120,7 +124,7 @@ void shutdown()
   idx = 0;
   while (idx < MAX_CLIENTS)
   {
-    if (clients[idx].sockfd >= 0)
+	  if (clients[idx].sockfd >= 0)
     {
       delete_client(idx);
 	  send_thread[idx]->ExitThread();
@@ -144,7 +148,6 @@ void signal_handler(int signo)
     cout << "unexpected signal = " << signo << " '" << strerror(signo) << "'" << endl;
     exit(0);
   }
-
   shutdown();
   exit(0);
 }
@@ -545,10 +548,10 @@ int main(int argc, char *argv[])
 
   init_clients();
   if ((halfsd = startup_server(ipaddr, portno)) < 0)
-  {
-    shutdown();
-    exit(1);
-  }
+   {
+	   shutdown();
+      exit(1);
+   }
 
   while (1)
   {
@@ -558,7 +561,7 @@ int main(int argc, char *argv[])
     if (fullsd < 0)
     {
       printf("error : accept() : %s\n", strerror(errno));
-      shutdown();
+	  shutdown();
       break;
     }
 
