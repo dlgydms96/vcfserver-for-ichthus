@@ -52,6 +52,8 @@ class VThread
   /// Add a message to thread queue. 
   /// @param[in] data - thread specific information created on the heap using operator new.
   void PostInitialMsg(const Initial_msg* data);
+  void PostInitialPrmMsg(const Initial_msg* data);
+  void PostInitialCmdMsg(const Initial_msg* data);
   void PostOperationalMsg(const Operational_msg* data);
 
   /// added by khkim
@@ -135,7 +137,33 @@ void VThread::PostInitialMsg(const Initial_msg* data)
 {
   ASSERT_TRUE(m_thread);
 
-  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Initial_MSG,0, data);
+  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Initial_MSG,0,data);
+
+  // Add user data msg to queue and notify worker thread
+  std::unique_lock<std::mutex> lk(m_mutex);
+  m_queue.push(threadMsg);
+  m_cv.notify_one();
+}
+
+
+void VThread::PostInitialCmdMsg(const Initial_msg* data) 
+{
+  ASSERT_TRUE(m_thread);
+
+  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Initial_MSG,1, data);
+
+  // Add user data msg to queue and notify worker thread
+  std::unique_lock<std::mutex> lk(m_mutex);
+  m_queue.push(threadMsg);
+  m_cv.notify_one();
+}
+
+
+void VThread::PostInitialPrmMsg(const Initial_msg* data) 
+{
+  ASSERT_TRUE(m_thread);
+
+  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Initial_MSG,2, data);
 
   // Add user data msg to queue and notify worker thread
   std::unique_lock<std::mutex> lk(m_mutex);
@@ -147,7 +175,7 @@ void VThread::PostOperationalMsg(const Operational_msg* data)
 {
   ASSERT_TRUE(m_thread);
 
-  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Operational_MSG,3, data);
+  ThreadMsg* threadMsg = new ThreadMsg(MSG_POST_Operational_MSG,1, data);
 
   // Add user data msg to queue and notify worker thread
   std::unique_lock<std::mutex> lk(m_mutex);
@@ -192,11 +220,12 @@ void VThread::Process()
         case MSG_POST_Initial_MSG : 
         {
               ASSERT_TRUE(msg->msg != NULL);
-              // Convert the ThreadMsg void* data back to a Umsg* 
+              
+			  // Convert the ThreadMsg void* data back to a Umsg* 
               const Initial_msg* umsg = static_cast<const Initial_msg*>(msg->msg);
               normal_handler(this, msg);
-	
-              // Delete dynamic data passed through message queue
+              
+			  // Delete dynamic data passed through message queue
               delete umsg;
               delete msg;
               break;
@@ -208,8 +237,8 @@ void VThread::Process()
               std::unique_lock<std::mutex> lk(m_mutex);
               while (!m_queue.empty())
               {
-        	msg = m_queue.front();
-        	m_queue.pop();
+	        	msg = m_queue.front();
+    	    	m_queue.pop();
 
               }
               exit_handler(this);

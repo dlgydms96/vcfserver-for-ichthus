@@ -1,5 +1,6 @@
 #include "myVCFServ.h"
 
+//#define SERVER_IPADDR "127.0.0.1"
 #define SERVER_IPADDR "192.168.0.4"
 #define SERVER_PORTNO 9000
 #define MAX_CLIENTS 1
@@ -11,7 +12,7 @@ int connect_start = 1;
 int nclients = 0;
 
 pthread_t recv_thread_id[MAX_CLIENTS];
-VThread *send_thread[MAX_CLIENTS] = {NULL};
+VThread *send_thread[MAX_CLIENTS] = {NULL,};
 VThread *init_thread = NULL;
 VThread *ecat_thread = NULL;
 VThread *obd2_thread = NULL;
@@ -107,27 +108,39 @@ void shutdown()
   {
     if (recv_thread_id[idx] != 0)
     {
-	  pthread_cancel(recv_thread_id[idx]);
+      pthread_cancel(recv_thread_id[idx]);
       pthread_join(recv_thread_id[idx], (void **)retval);
-  	  if (retval == PTHREAD_CANCELED)
-	  {
-     	cout << "recv_thread canceled" << endl;
-	  }
+      if (retval == PTHREAD_CANCELED)
+        cout << "recv_thread canceled" << endl;
       else
-	  {
-    	cout << "recv_thread cancellation failed" << endl;
-	  }
+        cout << "recv_thread cancellation failed" << endl;
       recv_thread_id[idx] = 0;
     }
     ++idx;
   }
   idx = 0;
+  /*  ecat_var[15].value = 0;
+  ecat_var[14].value = 0;
+  connect_start = 1;
+  if(ecat_var[necat_var - 1].value != 3) {
+    ecat_off();
+    ecat_down();
+  }
+  if(obd2_var[nobd2_var - 1].value != 3) {
+    obd_off();
+    obd_down();
+  }
+  ecat_thread->ExitThread();
+  obd2_thread->ExitThread();
+  delete ecat_thread; ecat_thread = NULL;
+  delete obd2_thread; obd2_thread = NULL;
+ */
   while (idx < MAX_CLIENTS)
   {
-	  if (clients[idx].sockfd >= 0)
+    if (clients[idx].sockfd >= 0)
     {
       delete_client(idx);
-	  send_thread[idx]->ExitThread();
+      send_thread[idx]->ExitThread();
       delete send_thread[idx];
       send_thread[idx] = NULL;
     }
@@ -148,6 +161,7 @@ void signal_handler(int signo)
     cout << "unexpected signal = " << signo << " '" << strerror(signo) << "'" << endl;
     exit(0);
   }
+
   shutdown();
   exit(0);
 }
@@ -300,29 +314,8 @@ void *recv_thread(void *arg)
 
     readHdr(hdr, buffer);
 
-    if (hdr[0] == 3)
+    if (hdr[0] == 1)
     {
-      Operational_msg *umsg;
-      printf("#############It's Operational_msg################\n\t");
-      printf("\tin recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
-      umsg = operational_ReadBody(clients[client_idx].sockfd, hdr);
-      switch (umsg->_to())
-      {
-      case ECAT:
-        ecat_thread->PostOperationalMsg((const Operational_msg *)umsg);
-        break;
-      case OBD2 :
-        obd2_thread->PostOperationalMsg((const Operational_msg *) umsg);
-        break;
-      }
-
-      umsg->set__result(2);
-      printf("\tbefore PostOperationalMsg\n client_idx = %d\n", client_idx);
-      send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
-    }
-
-	else if ((hdr[0] == 1) || (hdr[0] == 2))
-	{
       Operational_msg *umsg;
       printf("#############It's Operational_msg################\n\t");
       printf("\tin recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
@@ -339,18 +332,16 @@ void *recv_thread(void *arg)
 
       umsg->set__result(2);
       printf("\tbefor PostOperationalMsg\n client_idx = %d\n", client_idx);
-//      send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
- }
+      send_thread[client_idx]->PostOperationalMsg((const Operational_msg *) umsg);
+    }
+
     else if (hdr[0] == 0)
     {
-      Initial_msg *umsg;
-      printf("#############It's Initial_msg################\n\t");
+   	 Initial_msg *umsg;
+     printf("#############It's Initial_msg################\n\t");
       printf("in recv in if: client_idx = %d cliets[*client_idx].sockfd= %d \n", client_idx, clients[client_idx].sockfd);
       umsg = initial_ReadBody(clients[client_idx].sockfd, hdr);
       init_thread->PostInitialMsg((const Initial_msg *) umsg);
-
-      umsg->set__result(2);
-      send_thread[client_idx]->PostInitialMsg((const Initial_msg *) umsg);
     }
 
     else
@@ -360,52 +351,16 @@ void *recv_thread(void *arg)
     printf("recv end\n###############################################\n");
   }
 }
-
 /////////////////////////////////////////////////////
 // 3 manager_threads
 ////////////////////////////////////////////////////
 
 void ecat_handler(VThread *t, ThreadMsg *msg)
 {
-  cout << "***************in ecat_handler start!**************" << endl;
-  const Operational_msg *oper_msg = static_cast<const Operational_msg *>(msg->msg);
-  int i;
-  if ((oper_msg->_varid()) == (ecat_var[ECAT_STATE].varID))
-  {
-    cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-    ecat_var[ECAT_STATE].value = oper_msg->_value();
-  }
-  else if ((oper_msg->_varid()) == (ecat_var[ECAT_MOTOR_STATE].varID))
-  {
-    cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-    ecat_var[ECAT_MOTOR_STATE].value = oper_msg->_value();
-  }
-  else
-  {
-    for (i = 0; i < ECAT_MAX; i++)
-    {
-      if (oper_msg->_varid() == ecat_var[i].varID)
-      {
-        cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-        ecat_var[i].value = oper_msg->_value();
-        break;
-      }
-    }
-    if(i==ECAT_MAX-1)
-    cout<<"unknown ecat_var id"<<endl;
-  }
-  cout << "*****************************************************" <<endl;
 }
 
 void obd2_handler(VThread *t, ThreadMsg *msg)
 {
-    cout << "in obd2_handler start!" << endl;
-    const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
-    if((oper_msg->_varid()) == (obd2_var[OBD2_STATE].varID))
-    {
-      cout << "oper_msg->_value() = " << oper_msg->_value() << endl;
-      obd2_var[OBD2_STATE].value = oper_msg->_value();
-    }
 }
 
 
@@ -415,73 +370,154 @@ void obd2_handler(VThread *t, ThreadMsg *msg)
 
 void send_handler(VThread *t, ThreadMsg *msg)
 {
-  cout << "****Proto Send****" << endl;
-  int msg_type = msg->msgType;
-  int siz;
-  char *pkt;
-  switch (msg_type)
-  {
-  case 1:
-  case 3:
-  {
-    const Operational_msg *oper_msg = static_cast<const Operational_msg *>(msg->msg);
-    cout << "\tsize after serilizing is " << oper_msg->ByteSize() << endl;
-    siz = oper_msg->ByteSize();
-    pkt = new char[siz + 2];
-    google::protobuf::io::ArrayOutputStream aos(pkt, siz + 2);
-    CodedOutputStream *coded_output = new CodedOutputStream(&aos);
-    coded_output->WriteVarint32(msg_type);
-    coded_output->WriteVarint32(siz);
-    oper_msg->SerializeToCodedStream(coded_output);
-    cout << "\tin send_handler -> oper Message is \n"
-         << oper_msg->DebugString() << endl;
-    break;
-  }
-  case 0:
-  {
-    const Initial_msg *init_msg = static_cast<const Initial_msg *>(msg->msg);
-    cout << "\tsize after serilizing is " << init_msg->ByteSize() << endl;
-    siz = init_msg->ByteSize();
-    pkt = new char[siz + 2];
-    google::protobuf::io::ArrayOutputStream aos(pkt, siz + 2);
-    CodedOutputStream *coded_output = new CodedOutputStream(&aos);
-    coded_output->WriteVarint32(msg_type);
-    coded_output->WriteVarint32(siz);
-    init_msg->SerializeToCodedStream(coded_output);
-    cout << "in send_handler -> init Message is \n"
-         << init_msg->DebugString() << endl;
-    break;
-  }
+	cout << "****Proto Send****" << endl;
+	int msg_type = msg->msgType;
+	int siz;
+	char *pkt;
+	switch (msg_type)
+	{
+		/*
+		   case 1: 
+		   {
+		   const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
+		   cout<<"\tsize after serilizing is "<<oper_msg->ByteSize()<<endl;
+		   siz = oper_msg->ByteSize();
+		   pkt = new char [siz+2];
+		   google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
+		   CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+		   coded_output->WriteVarint32(msg_type);
+		   coded_output->WriteVarint32(siz);
+		   oper_msg->SerializeToCodedStream(coded_output);
+		   cout<<"\tin send_handler -> oper Message is \n"<<oper_msg->DebugString()<<endl;
+		   break;
+		   }
+
+		   case 0:
+		   {
+		   const Initial_msg *init_msg = static_cast<const Initial_msg *>(msg->msg);
+		   cout << "\tsize after serilizing is " << init_msg->ByteSize() << endl;
+		   siz = init_msg->ByteSize();
+		   pkt = new char[siz + 2];
+		   google::protobuf::io::ArrayOutputStream aos(pkt, siz + 2);
+		   CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+		   coded_output->WriteVarint32(msg_type);
+		   coded_output->WriteVarint32(siz);
+		   init_msg->SerializeToCodedStream(coded_output);
+		   cout << "in send_handler -> init Message is \n"
+		   << init_msg->DebugString() << endl;
+		   break;
+		   }*/
+		case 3 :
+			{
+				const Operational_msg* oper_msg = static_cast<const Operational_msg*>(msg->msg);
+				cout<<"\tsize after serilizing is "<<oper_msg->ByteSize()<<endl;
+				siz = oper_msg->ByteSize();
+				pkt = new char [siz+2];
+				google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
+				CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+				coded_output->WriteVarint32(msg_type);
+				coded_output->WriteVarint32(siz);
+				oper_msg->SerializeToCodedStream(coded_output);
+				cout<<"\tin send_handler -> oper Message is \n"<<oper_msg->DebugString()<<endl;
+				break;
+			}
+		case 2 :
+			{
+				const Initial_msg* init_msg = static_cast<const Initial_msg*>(msg->msg);
+				cout<<"\tsize after serilizing is "<<init_msg->ByteSize()<<endl;
+				siz = init_msg->ByteSize();
+				pkt = new char [siz+2];
+				google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
+				CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+				coded_output->WriteVarint32(msg_type);
+				coded_output->WriteVarint32(siz);
+				init_msg->SerializeToCodedStream(coded_output);
+				cout<<"in send_handler -> cmd Message is \n"<<init_msg->DebugString()<<endl;
+				break;
+			}
+		case 1 :
+			{
+				const Initial_msg* init_msg = static_cast<const Initial_msg*>(msg->msg);
+				cout<<"\tsize after serilizing is "<<init_msg->ByteSize()<<endl;
+				siz = init_msg->ByteSize();
+				pkt = new char [siz+2];
+				google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
+				CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+				coded_output->WriteVarint32(msg_type);
+				coded_output->WriteVarint32(siz);
+				init_msg->SerializeToCodedStream(coded_output);
+				cout<<"in send_handler -> param Message is \n"<<init_msg->DebugString()<<endl;
+				break;
+			}
+		case 0 :
+			{
+				const Initial_msg* init_msg = static_cast<const Initial_msg*>(msg->msg);
+				cout<<"\tsize after serilizing is "<<init_msg->ByteSize()<<endl;
+				siz = init_msg->ByteSize();
+				pkt = new char [siz+2];
+				google::protobuf::io::ArrayOutputStream aos(pkt,siz+2);
+				CodedOutputStream *coded_output = new CodedOutputStream(&aos);
+				coded_output->WriteVarint32(msg_type);
+				coded_output->WriteVarint32(siz);
+				init_msg->SerializeToCodedStream(coded_output);
+				cout<<"in send_handler -> init Message is \n"<<init_msg->DebugString()<<endl;
+				break;
+			}
+
+	  default:
+		  {
+			  cout<<"Wrong message!!"<<endl;
+		  }
   }
 
   cout << "\tin send_handler -> \nBODY: bytecount = " << siz << endl;
   for (int i = 0; i < siz + 2; ++i)
   {
-    printf("_%d", pkt[i]);
+	  printf("_%d", pkt[i]);
   }
   printf("\n");
 
   for (int i = 0; i < nclients; ++i)
   {
-    if (write(clients[i].sockfd, pkt, siz + 2) < 0)
-    {
-      cout << t->get_thread_name() << ": " << strerror(errno) << endl;
-      kill(getpid(), SIGINT);
-    }
-    cout << "\tafter write in send_handler\n"
-         << endl;
+	  if (write(clients[i].sockfd, pkt, siz + 2) < 0)
+	  {
+		  cout << t->get_thread_name() << ": " << strerror(errno) << endl;
+		  kill(getpid(), SIGINT);
+	  }
+	  cout << "\tafter write in send_handler\n"
+		  << endl;
   }
 }
 
 void init_handler(VThread *t, ThreadMsg *msg)
 {
-	while(1)
-	{
-	  const Initial_msg *umsg = static_cast<const Initial_msg *>(msg->msg);
-	  umsg->set__result(2);
-      send_thread[nclients]->PostInitialMsg((const Initial_msg *) umsg);
-	}
+	cout << "****Init handler****" << endl;
+	const Initial_msg *umsg = static_cast<const Initial_msg *>(msg->msg);
+	Initial_msg *init_msg = new Initial_msg;
+	*init_msg=*umsg;
+	init_msg -> set__result(1);
+	send_thread[0]->PostInitialMsg((const Initial_msg *) init_msg);
+
+	
+	Initial_msg *prm_msg = new Initial_msg;
+	sleep(0.5); 
+	vcf::Initial_msg::Cmd* initial_cmd_msg = prm_msg->add_cmd();
+	vcf::Initial_msg::Prm* initial_prm_msg = prm_msg->add_prm();
+	prm_msg -> set__seqno(1);
+	prm_msg -> set__version(1);
+	prm_msg -> set__result(2);
+	prm_msg -> set__msg("its dynmc prm msg");
+	initial_cmd_msg -> set__from(2);
+	initial_cmd_msg -> set__name("velocity");
+	initial_cmd_msg -> set__varid(100);
+	initial_cmd_msg -> set__value(30);
+	initial_prm_msg -> set__vartype(2);
+	initial_prm_msg -> set__min(0);
+	initial_prm_msg -> set__max(100);
+	send_thread[0]->PostInitialPrmMsg((const Initial_msg *) prm_msg);
+
 }
+
 ///////////////////////////////////////////////
 // main function
 ///////////////////////////////////////////////
@@ -548,10 +584,10 @@ int main(int argc, char *argv[])
 
   init_clients();
   if ((halfsd = startup_server(ipaddr, portno)) < 0)
-   {
-	   shutdown();
-      exit(1);
-   }
+  {
+    shutdown();
+    exit(1);
+  }
 
   while (1)
   {
@@ -561,7 +597,7 @@ int main(int argc, char *argv[])
     if (fullsd < 0)
     {
       printf("error : accept() : %s\n", strerror(errno));
-	  shutdown();
+      shutdown();
       break;
     }
 
@@ -584,7 +620,6 @@ int main(int argc, char *argv[])
       shutdown();
       break;
     }
-
     send_thread[nclients] = new VThread("send_thread", send_handler, exit_handler);
     send_thread[nclients]->CreateThread();
 
@@ -592,16 +627,13 @@ int main(int argc, char *argv[])
     {
       // create the following threads only once --> move the following code outside the while loop
       init_thread = new VThread("init_thread", init_handler, exit_handler);
-      init_thread->CreateThread();
+        init_thread->CreateThread();
       
-      //HA_Obd2MgrThread();
-      obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
+ /*     obd2_thread = new VThread("obd2_thread", obd2_handler, exit_handler);
     	obd2_thread->CreateThread();
    
-      //HA_EcatMgrThread();
-      //HA_EcatCyclicThread();
       ecat_thread = new VThread("ecat_thread", ecat_handler, exit_handler);
-      ecat_thread->CreateThread();
+      ecat_thread->CreateThread();*/
       connect_start = 0;
     }
     ++nclients;

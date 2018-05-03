@@ -19,7 +19,6 @@ int prev_pos;
 int total_pos;
 int handle_count;
 
-
 offset_CSP offset_csp[SLAVE_NUM];
 /* Master 0, Slave 0, "EPOS3"
  * Vendor ID:       0x000000fb
@@ -366,7 +365,6 @@ void control_handle() //use global.c
   }
 }
 
-
 //for pid control
 int kp;
 int ki;
@@ -374,7 +372,7 @@ int kd;
 int dt = 1;
 double I_err;
 double D_err;
-double err;
+double cur_err;
 double prev_err;
 double Kp_term;
 double Ki_term;
@@ -383,22 +381,249 @@ double power;
 int acc_count;
 int dec_count;
 int pedal_state = ACCELERATOR;
-
+void my_pid_calc2()
+{
+  static int kp, ki, kd;
+  static int tmp_tvel = ecat_var[ECAT_TVEL].value;
+  int vel_from_obd = obd2_var[OBD2_VEL].value;
+  static int prev_vel_from_obd = 0;
+  //static int pedal_state = ACCELERATOR;
+  static int changed_tvel = 0;
+  static int keep_state = 0;
+  static int delta = ecat_var[ECAT_VEL_DIFF].value; // should be
+  static int is_fast = 1;
+  static int past_tvel = tmp_tvel;
+  static int check_count = 0;
+  static int changed_state = 0;
+  static int check_vel[4] = {0};
+  static int check_vel_count = 0;
+  static double very_past_err = 0;
+  static int past_err = 0;
+  char buf[1024];
+  //cout<<"in pid_control"<<endl;
+  if (vel_from_obd > 255)
+  {
+    vel_from_obd = prev_vel_from_obd;
+  }
+  prev_vel_from_obd = vel_from_obd;
+  if (past_tvel != ecat_var[ECAT_TVEL].value) // user changed tvel
+  {
+    past_tvel = ecat_var[ECAT_TVEL].value;
+    changed_tvel = 1;
+    keep_state = 1;
+    delta = ecat_var[ECAT_VEL_DIFF].value;
+    tmp_tvel = vel_from_obd;
+    if (ecat_var[ECAT_TVEL].value > vel_from_obd)
+    {
+      is_fast = 0;
+    }
+    else
+    {
+      is_fast = 1;
+    }
+    changed_state = 0;
+    check_vel_count = 0;
+  }
+  if (changed_tvel)
+  {
+    if (is_fast)
+    {
+      if (vel_from_obd < tmp_tvel + (delta - 1)) // is fast now but not that fast (its slower than tmp_tvel + delta)
+      {
+        if (vel_from_obd > past_tvel + delta) // its still fast
+        {
+          tmp_tvel = vel_from_obd - delta; //should change tmp_tvel smaller
+        }
+        else // now its stable
+        {
+          tmp_tvel = past_tvel;
+          changed_tvel = 0;
+        }
+      }
+    }
+    else
+    {
+      if (vel_from_obd > tmp_tvel - (delta - 1)) // its slow but not that slow
+      {
+        if (vel_from_obd < past_tvel - delta) //its getting very slower
+        {
+          tmp_tvel = vel_from_obd + delta; // should change tmp_tvel little bit bigger
+        }
+        else
+        {
+          tmp_tvel = past_tvel;
+          changed_tvel = 0;
+        }
+      }
+    }
+  }
+  else // if user do not change tvel
+  {
+    tmp_tvel = past_tvel;
+    changed_tvel = 0;
+  }
+  motor_info[ACCEL_SLAVE].act_pos = get_motor_pos(ACCEL_SLAVE);
+  motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE);
+  very_past_err = past_err;
+  past_err = past_tvel - vel_from_obd;
+  cur_err = tmp_tvel - vel_from_obd;
+  switch (pedal_state)
+  {
+  case ACCELERATOR:
+    printf("ACCEL\n");
+    kp = ecat_var[ECAT_KPT].value;
+    ki = ecat_var[ECAT_KIT].value;
+    kd = ecat_var[ECAT_KDT].value;
+    if (changed_state) // it was DECELARATOR right before(noticed that it is uphill)
+    {
+      if (tmp_tvel > vel_from_obd) //is slow
+      {
+        check_vel[check_vel_count] = vel_from_obd;
+        ++check_vel_count;
+        if (check_vel_count > 3)
+        {
+          if (check_vel[0] >= check_vel[3])
+          {
+            I_err = (15000 + 1000 * (check_vel[0] - check_vel[3])) / ecat_var[ECAT_KIT].value;
+          }
+          changed_state = 0;
+          check_vel_count = 0;
+        }
+      }
+      else
+      {
+        changed_state = 0;
+        check_vel_count = 0;
+      }
+    }
+    if (vel_from_obd > tmp_tvel) // is fast
+    {
+      if (motor_info[ACCEL_SLAVE].act_pos == 0 || vel_from_obd > tmp_tvel + 3) // is very fast
+      {
+        if (keep_state)
+        {
+          if (very_past_err > past_err) // but is getting slower
+          {
+            ++check_count;
+          }
+          else if (past_err > very_past_err) // its getting more faster!
+          {
+            if (!check_count)
+            {
+              --check_count;
+            }
+          }
+          if (check_count > 3) // idle time over, should change state
+          {
+            check_count = 0;
+            keep_state = 0;
+          }
+          kp = ecat_var[ECAT_KPT].value;
+          ki = ecat_var[ECAT_KIT].value;
+          kd = ecat_var[ECAT_KDT].value;
+        }
+        else // should change state
+        {
+          pedal_state = DECELERATOR;
+          I_err = 0;
+          prev_err = 0;
+          kp = ecat_var[ECAT_KPB].value;
+          ki = ecat_var[ECAT_KIB].value;
+          kd = ecat_var[ECAT_KDB].value;
+          check_count = 0;
+          keep_state = 0;
+        }
+      }
+      else // its fast but under delta, keep this state
+      {
+        kp = ecat_var[ECAT_KPT].value;
+        ki = ecat_var[ECAT_KIT].value;
+        kd = ecat_var[ECAT_KDT].value;
+      }
+    }
+    else // is not fast yet
+    {
+      keep_state = 0;
+      check_count = 0;
+    }
+    break;
+  case DECELERATOR:
+    printf("DECEL\n");
+    kp = ecat_var[ECAT_KPB].value;
+    ki = ecat_var[ECAT_KIB].value;
+    kd = ecat_var[ECAT_KDB].value;
+    if (vel_from_obd < tmp_tvel) // is slow
+    {
+      if (motor_info[BRAKE_SLAVE].act_pos == 0 || vel_from_obd < tmp_tvel - 3) // is very slow
+      {
+        if (keep_state)
+        {
+          if (very_past_err < past_err) // is very slow but getting faster
+          {
+            ++check_count;
+          }
+          else if (past_err < very_past_err) // is getting more slower
+          {
+            if (!check_count)
+            {
+              --check_count;
+            }
+          }
+          if (check_count > 3) // its very slow should switch state
+          {
+            check_count = 0;
+            keep_state = 0;
+          }
+        }
+        else
+        {
+          changed_state = 1;
+          pedal_state = ACCELERATOR;
+          I_err = 0;
+          prev_err = 0;
+          kp = ecat_var[ECAT_KPT].value;
+          ki = ecat_var[ECAT_KIT].value;
+          kd = ecat_var[ECAT_KDT].value;
+          check_count = 0;
+          keep_state = 0;
+        }
+      }
+    }
+    else // is fast
+    {
+      keep_state = 0;
+      check_count = 0;
+    }
+    break;
+  }
+  Kp_term = kp * cur_err;
+  I_err += cur_err * dt;
+  Ki_term = ki * I_err;
+  D_err = (prev_err - cur_err) / dt;
+  Kd_term = kd * D_err;
+  power = Kp_term + Ki_term + Kd_term;
+  prev_err = cur_err;
+  sprintf(buf, "Kp_term : %lf\tKi_term : %lf\tPower : %lf\tnACC : %d\tnDEC : %d\n", Kp_term, Ki_term, power, acc_count, dec_count);
+  // sprintf(buf, "Pedal_state : %d\tMaintain : %d\tCheck_count : %d\tPower : %lf\tpast_tvel : %d\tTvel : %d\tAct_Vel : %d\n", pedal_state, maintain, check_count, power, past_tvel, tmp_tvel, vel_from_obd);
+  write(pid_fd, buf, strlen(buf));
+  //slope_measure(pedal_state, vel_from_obd); // said not using?
+  return;
+}
 
 void pid_calc() // not using int maintain1
 {
-  static int kp, ki, kd;                               //
-  static int tvel = ecat_var[ECAT_TVEL].value;               //
-  int vel_from_obd = obd2_var[OBD2_VEL].value;               //
-  static int prev_vel_from_obd = 0;                    //
+  static int kp, ki, kd;                       //
+  static int tvel = ecat_var[ECAT_TVEL].value; //
+  int vel_from_obd = obd2_var[OBD2_VEL].value; //
+  static int prev_vel_from_obd = 0;            //
   //static int pedal_state = ACCELERATOR;                //
-  static int maintain = 0;                             //
-  static int vel_diff = 0;                             //
+  static int maintain = 0;                                   //
+  static int vel_diff = 0;                                   //
   static int vel_diff_count = ecat_var[ECAT_VEL_DIFF].value; //
-  static int temp_count = 3;                           //
-  static int act_tvel = tvel;                          //
-  static int check_count = 0;                          //
-  static int change_pedal = 0;                         //
+  static int temp_count = 3;                                 //
+  static int act_tvel = tvel;                                //
+  static int check_count = 0;                                //
+  static int change_pedal = 0;                               //
   static int check_vel[4] = {0};
   static int check_vel_count = 0; //
   static double check_err = 0;    //
@@ -481,7 +706,7 @@ void pid_calc() // not using int maintain1
 
   check_err = act_err;
   act_err = act_tvel - vel_from_obd;
-  err = tvel - vel_from_obd;
+  cur_err = tvel - vel_from_obd;
 
   switch (pedal_state)
   {
@@ -512,7 +737,7 @@ void pid_calc() // not using int maintain1
         check_vel_count = 0;
       }
     }
-    if (err < 0)
+    if (cur_err < 0)
     {
       if (motor_info[ACCEL_SLAVE].act_pos == 0 || vel_from_obd > tvel + 3)
       {
@@ -561,7 +786,7 @@ void pid_calc() // not using int maintain1
     kp = ecat_var[ECAT_KPB].value;
     ki = ecat_var[ECAT_KIB].value;
     kd = ecat_var[ECAT_KDB].value;
-    if (err > 0)
+    if (cur_err > 0)
     {
       if (motor_info[BRAKE_SLAVE].act_pos == 0 || vel_from_obd < tvel - 3)
       {
@@ -599,20 +824,17 @@ void pid_calc() // not using int maintain1
     break;
   }
 
-  Kp_term = kp * err;
-  I_err += err * dt;
+  Kp_term = kp * cur_err;
+  I_err += cur_err * dt;
   Ki_term = ki * I_err;
-  D_err = (prev_err - err) / dt;
+  D_err = (prev_err - cur_err) / dt;
   Kd_term = kd * D_err;
 
   power = Kp_term + Ki_term + Kd_term;
 
-  prev_err = err;
+  prev_err = cur_err;
 
-
-
-  
-  sprintf(buf, "Kp_term : %lf\tKi_term : %lf\tPower : %lf\tnACC : %d\tnDEC : %d\n", Kp_term, Ki_term , power, acc_count, dec_count);
+  sprintf(buf, "Kp_term : %lf\tKi_term : %lf\tPower : %lf\tnACC : %d\tnDEC : %d\n", Kp_term, Ki_term, power, acc_count, dec_count);
   sprintf(buf, "Pedal_state : %d\tMaintain : %d\tCheck_count : %d\tPower : %lf\tAct_tvel : %d\tTvel : %d\tAct_Vel : %d\n", pedal_state, maintain, check_count, power, act_tvel, tvel, vel_from_obd);
   write(pid_fd, buf, strlen(buf));
   //  slope_measure(pedal_state, vel_from_obd);
@@ -653,7 +875,7 @@ void pid_calc2()
     act_tvel = ecat_var[ECAT_TVEL].value;
     tvel = act_tvel;
     //++ecat_var[ECAT_TVEL].timestampE;
-  
+
     maintain = 1;
 
     act_tvel = tvel;
@@ -673,7 +895,7 @@ void pid_calc2()
     }
     change_pedal = 0;
     check_vel_count = 0;
-  }//end of if (act_tvel != ecat_var[ECAT_TVEL].value)
+  } //end of if (act_tvel != ecat_var[ECAT_TVEL].value)
 
   if (maintain)
   {
@@ -727,7 +949,7 @@ void pid_calc2()
 
   check_err = act_err;
   act_err = act_tvel - vel_from_obd;
-  err = tvel - vel_from_obd;
+  cur_err = tvel - vel_from_obd;
 
   switch (pedal_state)
   {
@@ -758,7 +980,7 @@ void pid_calc2()
         check_vel_count = 0;
       }
     }
-    if (err < 0)
+    if (cur_err < 0)
     {
       if (motor_info[ACCEL_SLAVE].act_pos == 0 || vel_from_obd > tvel + 3)
       {
@@ -815,7 +1037,7 @@ void pid_calc2()
     kp = ecat_var[ECAT_KPB].value;
     ki = ecat_var[ECAT_KIB].value;
     kd = ecat_var[ECAT_KDB].value;
-    if (err > 0)
+    if (cur_err > 0)
     {
       if (motor_info[BRAKE_SLAVE].act_pos == 0 || vel_from_obd < tvel - 3)
       {
@@ -861,20 +1083,17 @@ void pid_calc2()
     break;
   }
 
-  Kp_term = kp * err;
-  I_err += err * dt;
+  Kp_term = kp * cur_err;
+  I_err += cur_err * dt;
   Ki_term = ki * I_err;
-  D_err = (prev_err - err) / dt;
+  D_err = (prev_err - cur_err) / dt;
   Kd_term = kd * D_err;
 
   power = Kp_term + Ki_term + Kd_term;
 
-  prev_err = err;
+  prev_err = cur_err;
 
-  
-  
-
-  sprintf(buf, "Kp_term : %lf\tKi_term : %lf\tPower : %lf\tnACC : %d\tnDEC : %d\n", Kp_term, Ki_term , power, acc_count, dec_count);
+  sprintf(buf, "Kp_term : %lf\tKi_term : %lf\tPower : %lf\tnACC : %d\tnDEC : %d\n", Kp_term, Ki_term, power, acc_count, dec_count);
   sprintf(buf, "Pedal_state : %d\tMaintain : %d\tCheck_count : %d\tPower : %lf\tAct_tvel : %d\tTvel : %d\tAct_Vel : %d\n", pedal_state, maintain, check_count, power, act_tvel, tvel, vel_from_obd);
   write(pid_fd, buf, strlen(buf));
   //slope_measure(pedal_state, vel_from_obd); // said not using?
@@ -920,7 +1139,7 @@ void pid_accel()
   {
     motor_info[ACCEL_SLAVE].target_pos = 0;
   }
-  cout<< "[in pid_accel] power : "<<motor_info[ACCEL_SLAVE].target_pos<<endl;
+  cout << "[in pid_accel] power : " << motor_info[ACCEL_SLAVE].target_pos << endl;
 }
 void pid_brake()
 {
@@ -936,7 +1155,7 @@ void pid_brake()
   {
     motor_info[BRAKE_SLAVE].target_pos = 0;
   }
-  cout<< "[in pid_brake] power : "<<motor_info[BRAKE_SLAVE].target_pos<<endl;
+  cout << "[in pid_brake] power : " << motor_info[BRAKE_SLAVE].target_pos << endl;
 }
 void pid_finish()
 {
@@ -949,9 +1168,9 @@ void HA_PIDController()
   HA_pidcontrol = new HybridAutomata(PID_START, PID_FINISH);
   PID_CALC2ACCEL *pid_calc2accel = new PID_CALC2ACCEL();
   PID_CALC2BRAKE *pid_calc2brake = new PID_CALC2BRAKE();
-  HA_pidcontrol->setState(PID_CALC,   pid_calc2);
-  HA_pidcontrol->setState(PID_ACCEL,  pid_accel);
-  HA_pidcontrol->setState(PID_BRAKE,  pid_brake);
+  HA_pidcontrol->setState(PID_CALC, my_pid_calc2);
+  HA_pidcontrol->setState(PID_ACCEL, pid_accel);
+  HA_pidcontrol->setState(PID_BRAKE, pid_brake);
   HA_pidcontrol->setState(PID_FINISH, pid_finish);
   HA_pidcontrol->setCondition(PID_START, NULL, PID_CALC);
   HA_pidcontrol->setCondition(PID_CALC, pid_calc2accel, PID_ACCEL);
@@ -1129,7 +1348,7 @@ bool MOTOR_ON2ON::check(HybridAutomata *HA)
 /////////////////////////////////////////////////
 bool MOTOR_UP2ON::check(HybridAutomata *HA)
 {
-  
+
   int cnt = 0;
   if (HA->curState == MOTOR_UP)
   {
@@ -1138,7 +1357,6 @@ bool MOTOR_UP2ON::check(HybridAutomata *HA)
       if (master_info.slave_state[index].al_state == 0x08)
       {
         cnt++;
-      
       }
     }
     if (cnt == SLAVE_NUM)
@@ -1154,7 +1372,7 @@ bool MOTOR_UP2ON::check(HybridAutomata *HA)
 
 bool MOTOR_ON2READY::check(HybridAutomata *HA)
 {
-  
+
   if (HA->curState == MOTOR_ON)
   {
     for (int index = 0; index < SLAVE_NUM; ++index)
@@ -1189,30 +1407,30 @@ bool MOTOR_ON2READY::check(HybridAutomata *HA)
     cout << "condition : MOTOR_ON2READY" << endl;
     return true;
   }
-  
+
   return false;
 }
-bool MOTOR_READY2AUTO::check(HybridAutomata *HA)
+bool MOTOR_READY2AUTO::check(HybridAutomata *HA)//need to change that when tvel came
 {
-  if(HA->curState == MOTOR_READY)
+  if (HA->curState == MOTOR_READY)
   {
     if (ecat_var[ECAT_MOTOR_STATE].value == MOTOR_AUTO)
     {
       cout << "condition : MOTOR_READY2AUTO" << endl;
-      cout << "ecat_var[ECAT_TVEL].value : "<<ecat_var[ECAT_TVEL].value<<endl;
+      cout << "ecat_var[ECAT_TVEL].value : " << ecat_var[ECAT_TVEL].value << endl;
       return true;
     }
-  } 
+  }
   return false;
 }
 bool MOTOR_READY2RESET::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_READY)
+  if (HA->curState == MOTOR_READY)
   {
-    if(ecat_var[ECAT_MOTOR_STATE].value == MOTOR_RESET)
+    if (ecat_var[ECAT_MOTOR_STATE].value == MOTOR_RESET)
     {
       cout << "condition : MOTOR_READY2RESET" << endl;
-     
+
       return true;
     }
   }
@@ -1220,18 +1438,18 @@ bool MOTOR_READY2RESET::check(HybridAutomata *HA)
 }
 bool MOTOR_AUTO2PID::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_AUTO)
+  if (HA->curState == MOTOR_AUTO)
   {
-    if((ecat_var[ECAT_MOTOR_STATE].value != MOTOR_RESET) &&
-      (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_REGULAR_STOP) &&
-      (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_EMERGENCY_STOP))
+    if ((ecat_var[ECAT_MOTOR_STATE].value != MOTOR_RESET) &&
+        (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_REGULAR_STOP) &&
+        (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_EMERGENCY_STOP))
     {
       if (glob_vel_timestamp != obd2_var[OBD2_VEL].timestamp)
       {
-        
+
         glob_vel_timestamp = obd2_var[OBD2_VEL].timestamp;
         cout << "condition : MOTOR_AUTO2PID" << endl;
-        cout << "ecat_var[ECAT_TVEL].value : "<<ecat_var[ECAT_TVEL].value<<endl;
+        cout << "ecat_var[ECAT_TVEL].value : " << ecat_var[ECAT_TVEL].value << endl;
         return true;
       }
     }
@@ -1240,7 +1458,7 @@ bool MOTOR_AUTO2PID::check(HybridAutomata *HA)
 }
 bool MOTOR_AUTO2AUTO::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_AUTO)
+  if (HA->curState == MOTOR_AUTO)
   {
     if ((ecat_var[ECAT_MOTOR_STATE].value != MOTOR_RESET) &&
         (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_REGULAR_STOP) &&
@@ -1258,9 +1476,9 @@ bool MOTOR_AUTO2AUTO::check(HybridAutomata *HA)
 
 bool MOTOR_READY2READY::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_READY)
+  if (HA->curState == MOTOR_READY)
   {
-    if((ecat_var[ECAT_MOTOR_STATE].value != MOTOR_AUTO) && (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_RESET))
+    if ((ecat_var[ECAT_MOTOR_STATE].value != MOTOR_AUTO) && (ecat_var[ECAT_MOTOR_STATE].value != MOTOR_RESET))
     {
       return true;
     }
@@ -1270,9 +1488,9 @@ bool MOTOR_READY2READY::check(HybridAutomata *HA)
 
 bool MOTOR_AUTO2RESET::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_AUTO)
+  if (HA->curState == MOTOR_AUTO)
   {
-    if(ecat_var[ECAT_MOTOR_STATE].value == MOTOR_RESET)
+    if (ecat_var[ECAT_MOTOR_STATE].value == MOTOR_RESET)
     {
       cout << "condition : MOTOR_AUTO2RESET" << endl;
       return true;
@@ -1286,32 +1504,32 @@ bool is_motor_reset(int num1, int num2, int num3, int num4)
   if (num1)
   {
     if (get_motor_pos(GEAR_SLAVE) > 100)
-    return false;
+      return false;
   }
   if (num2)
   {
     if (get_motor_pos(HANDLE_SLAVE) > 100)
-    return false;
+      return false;
   }
   if (num3)
   {
-    cout<< " num3 : " << get_motor_pos(ACCEL_SLAVE) << endl;
+    cout << " num3 : " << get_motor_pos(ACCEL_SLAVE) << endl;
     if (get_motor_pos(ACCEL_SLAVE) > 100)
-    return false;
+      return false;
   }
   if (num4)
   {
-    cout<< " num4 : " << get_motor_pos(BRAKE_SLAVE) << endl;
+    cout << " num4 : " << get_motor_pos(BRAKE_SLAVE) << endl;
     if (get_motor_pos(BRAKE_SLAVE) > 100)
-    return false;
+      return false;
   }
   return true;
 }
 bool MOTOR_RESET2READY::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_RESET)
+  if (HA->curState == MOTOR_RESET)
   {
-    if(is_motor_reset(0,0,1,1)==true)
+    if (is_motor_reset(0, 0, 1, 1) == true)
     {
       cout << "condition : MOTOR_RESET2READY" << endl;
       ecat_var[ECAT_MOTOR_STATE].value = MOTOR_READY;
@@ -1322,9 +1540,9 @@ bool MOTOR_RESET2READY::check(HybridAutomata *HA)
 }
 bool MOTOR_RESET2RESET::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_RESET)
+  if (HA->curState == MOTOR_RESET)
   {
-    if(is_motor_reset(0,0,1,1)==false)
+    if (is_motor_reset(0, 0, 1, 1) == false)
     {
       //cout << "condition : MOTOR_RESET2RESET" << endl;
       return true;
@@ -1334,9 +1552,9 @@ bool MOTOR_RESET2RESET::check(HybridAutomata *HA)
 }
 bool MOTOR_AUTO2REGULAR_STOP::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_AUTO)
+  if (HA->curState == MOTOR_AUTO)
   {
-    if(ecat_var[ECAT_MOTOR_STATE].value == MOTOR_REGULAR_STOP)
+    if (ecat_var[ECAT_MOTOR_STATE].value == MOTOR_REGULAR_STOP)
     {
       cout << "condition : MOTOR_AUTO2REGULAR_STOP" << endl;
       return true;
@@ -1346,9 +1564,9 @@ bool MOTOR_AUTO2REGULAR_STOP::check(HybridAutomata *HA)
 }
 bool MOTOR_REGULAR_STOP2REGULAR_STOP::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_REGULAR_STOP)
+  if (HA->curState == MOTOR_REGULAR_STOP)
   {
-    if((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) < 190000)
+    if ((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) < 190000)
     {
       cout << "condition : MOTOR_REGUALR_STOP2REGULAR_STOP" << endl;
       return true;
@@ -1357,15 +1575,14 @@ bool MOTOR_REGULAR_STOP2REGULAR_STOP::check(HybridAutomata *HA)
   return false;
 }
 
-
 bool MOTOR_REGULAR_STOP2READY::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_REGULAR_STOP)
+  if (HA->curState == MOTOR_REGULAR_STOP)
   {
-    if((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) > 190000) 
+    if ((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) > 190000)
     {
       ecat_var[ECAT_MOTOR_STATE].value = MOTOR_READY;
-      count=0;
+      count = 0;
       cout << "condition : MOTOR_REGUALR_STOP2READY" << endl;
       return true;
     }
@@ -1374,9 +1591,9 @@ bool MOTOR_REGULAR_STOP2READY::check(HybridAutomata *HA)
 }
 bool MOTOR_AUTO2EMERGENCY_STOP::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_AUTO)
+  if (HA->curState == MOTOR_AUTO)
   {
-    if(ecat_var[ECAT_MOTOR_STATE].value == MOTOR_EMERGENCY_STOP)
+    if (ecat_var[ECAT_MOTOR_STATE].value == MOTOR_EMERGENCY_STOP)
     {
       cout << "condition : MOTOR_AUTO2EMERGENCY_STOP" << endl;
       return true;
@@ -1386,9 +1603,9 @@ bool MOTOR_AUTO2EMERGENCY_STOP::check(HybridAutomata *HA)
 }
 bool MOTOR_EMERGENCY_STOP2EMERGENCY_STOP::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_EMERGENCY_STOP)
+  if (HA->curState == MOTOR_EMERGENCY_STOP)
   {
-    if((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) < 190000)
+    if ((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) < 190000)
     {
       cout << "condition : MOTOR_EMERGENCY_STOP2EMERGENCY_STOP" << endl;
       return true;
@@ -1398,9 +1615,9 @@ bool MOTOR_EMERGENCY_STOP2EMERGENCY_STOP::check(HybridAutomata *HA)
 }
 bool MOTOR_EMERGENCY_STOP2READY::check(HybridAutomata *HA)
 {
-  if(HA->curState == MOTOR_EMERGENCY_STOP)
+  if (HA->curState == MOTOR_EMERGENCY_STOP)
   {
-    if((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) > 190000)
+    if ((motor_info[BRAKE_SLAVE].act_pos = get_motor_pos(BRAKE_SLAVE)) > 190000)
     {
       ecat_var[ECAT_MOTOR_STATE].value = MOTOR_READY;
       cout << "condition : MOTOR_EMERGENCY_STOP2READY" << endl;
@@ -1453,7 +1670,6 @@ void motor_error()
   EC_WRITE_U16(master_info.domain_pd + offset_csp[motor_err_idx].ctrl_word, 0x000F);
   preprocessing_ecat();
   EC_WRITE_U16(master_info.domain_pd + offset_csp[motor_err_idx].ctrl_word, 0x0080);
-
 }
 void motor_up()
 {
@@ -1487,14 +1703,14 @@ void motor_auto()
 void motor_pid()
 {
   //cout << "\t\tmotor_pid" << endl;
-  
+
   while (1)
   {
     //HA_pidcontrol->curState=0;
     //printf("#START HA_pidcontrol : %d\n", HA_pidcontrol->curState);
     HA_pidcontrol->operate();
     //printf("#MIDDLE HA_pidcontrol : %d\n", HA_pidcontrol->curState);
-    if (HA_pidcontrol->curState == PID_FINISH) 
+    if (HA_pidcontrol->curState == PID_FINISH)
     {
       printf("#END HA_pidcontrol : %d\n", HA_pidcontrol->curState);
       HA_pidcontrol->curState = PID_START;
@@ -1516,22 +1732,21 @@ void reset_motor(int num1, int num2, int num3, int num4)
   }
   if (num3)
   {
-    cout<< "num3 : " << motor_info[ACCEL_SLAVE].act_pos << endl;
+    cout << "num3 : " << motor_info[ACCEL_SLAVE].act_pos << endl;
     motor_info[ACCEL_SLAVE].target_pos = 0;
     set_motor_pos(ACCEL_SLAVE);
   }
   if (num4)
   {
-    cout<< "num4 : " << motor_info[BRAKE_SLAVE].act_pos << endl;
+    cout << "num4 : " << motor_info[BRAKE_SLAVE].act_pos << endl;
     motor_info[BRAKE_SLAVE].target_pos = 0;
     set_motor_pos(BRAKE_SLAVE);
-
   }
 }
 void motor_reset()
 {
-  cout << "\t\tmotor_reset" <<endl;
-  ecat_var[ECAT_TVEL].value=0;
+  cout << "\t\tmotor_reset" << endl;
+  ecat_var[ECAT_TVEL].value = 0;
   reset_motor(0, 0, 1, 1);
 }
 void motor_regular_stop()
@@ -1548,7 +1763,7 @@ void motor_regular_stop()
 }
 void motor_emergency_stop()
 {
-  cout << "\t\tmotor_emergency_stop" <<endl;
+  cout << "\t\tmotor_emergency_stop" << endl;
   cout << " act_pos: " << motor_info[BRAKE_SLAVE].act_pos << endl;
   cout << " target_pos: " << motor_info[BRAKE_SLAVE].target_pos << endl;
   motor_info[ACCEL_SLAVE].target_pos = 0;
@@ -1558,31 +1773,31 @@ void motor_emergency_stop()
 
 void HA_EcatCyclicThread()
 {
-  cout<<"in HA_EcatCyclicThread func()"<<endl;
+  cout << "in HA_EcatCyclicThread func()" << endl;
 
   HA_ecatcyclic = new HybridAutomata(MOTOR_START, MOTOR_FINISH);
-  HA_ecatcyclic->setState(MOTOR_ERROR,          motor_error);
-  HA_ecatcyclic->setState(MOTOR_UP,             motor_up);
-  HA_ecatcyclic->setState(MOTOR_ON,             motor_on);
-  HA_ecatcyclic->setState(MOTOR_READY,          motor_ready);
-  HA_ecatcyclic->setState(MOTOR_AUTO,           motor_auto);
-  HA_ecatcyclic->setState(MOTOR_PID,            motor_pid);
-  HA_ecatcyclic->setState(MOTOR_RESET,          motor_reset);
-  HA_ecatcyclic->setState(MOTOR_REGULAR_STOP,   motor_regular_stop);
+  HA_ecatcyclic->setState(MOTOR_ERROR, motor_error);
+  HA_ecatcyclic->setState(MOTOR_UP, motor_up);
+  HA_ecatcyclic->setState(MOTOR_ON, motor_on);
+  HA_ecatcyclic->setState(MOTOR_READY, motor_ready);
+  HA_ecatcyclic->setState(MOTOR_AUTO, motor_auto);
+  HA_ecatcyclic->setState(MOTOR_PID, motor_pid);
+  HA_ecatcyclic->setState(MOTOR_RESET, motor_reset);
+  HA_ecatcyclic->setState(MOTOR_REGULAR_STOP, motor_regular_stop);
   HA_ecatcyclic->setState(MOTOR_EMERGENCY_STOP, motor_emergency_stop);
 
-//////////////////////setting conditions * 2 motor_error//////////////
+  //////////////////////setting conditions * 2 motor_error//////////////
   MOTOR_ALL2ERROR *motor_all2err = new MOTOR_ALL2ERROR();
-  HA_ecatcyclic->setCondition(MOTOR_UP, motor_all2err,MOTOR_ERROR);
-  HA_ecatcyclic->setCondition(MOTOR_ON, motor_all2err,MOTOR_ERROR);
-  HA_ecatcyclic->setCondition(MOTOR_READY, motor_all2err,MOTOR_ERROR);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_all2err,MOTOR_ERROR);
+  HA_ecatcyclic->setCondition(MOTOR_UP, motor_all2err, MOTOR_ERROR);
+  HA_ecatcyclic->setCondition(MOTOR_ON, motor_all2err, MOTOR_ERROR);
+  HA_ecatcyclic->setCondition(MOTOR_READY, motor_all2err, MOTOR_ERROR);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_all2err, MOTOR_ERROR);
   //HA_ecatcyclic->setCondition(MOTOR_PID, motor_all2err,MOTOR_ERROR);
   //HA_ecatcyclic->setCondition(MOTOR_RESET, motor_all2err,MOTOR_ERROR);
   //HA_ecatcyclic->setCondition(MOTOR_REGULAR_STOP, motor_all2err,MOTOR_ERROR);
   //HA_ecatcyclic->setCondition(MOTOR_EMERGENCY_STOP, motor_all2err,MOTOR_ERROR);
 
-//////////////////////setting conditions motor_error 2 *//////////////
+  //////////////////////setting conditions motor_error 2 *//////////////
   MOTOR_ERROR2UP *motor_error2up = new MOTOR_ERROR2UP();
   MOTOR_ERROR2ON *motor_error2on = new MOTOR_ERROR2ON();
   MOTOR_ERROR2READY *motor_error2ready = new MOTOR_ERROR2READY();
@@ -1591,16 +1806,16 @@ void HA_EcatCyclicThread()
   MOTOR_ERROR2RESET *motor_error2reset = new MOTOR_ERROR2RESET();
   MOTOR_ERROR2REGULAR_STOP *motor_error2regular_stop = new MOTOR_ERROR2REGULAR_STOP();
   MOTOR_ERROR2EMERGENCY_STOP *motor_error2emergency_stop = new MOTOR_ERROR2EMERGENCY_STOP();
-  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2up,MOTOR_UP);
-  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2on,MOTOR_ON);
-  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2ready,MOTOR_READY);
-  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2auto,MOTOR_AUTO);
+  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2up, MOTOR_UP);
+  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2on, MOTOR_ON);
+  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2ready, MOTOR_READY);
+  HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2auto, MOTOR_AUTO);
   //HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2pid,MOTOR_PID);
   //HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2reset,MOTOR_RESET);
   //HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2regular_stop,MOTOR_REGULAR_STOP);
   //HA_ecatcyclic->setCondition(MOTOR_ERROR, motor_error2emergency_stop,MOTOR_EMERGENCY_STOP);
 
-//////////////////////setting conditions of cycle state//////////////
+  //////////////////////setting conditions of cycle state//////////////
   MOTOR_UP2UP *motor_up2up = new MOTOR_UP2UP();
   MOTOR_ON2ON *motor_on2on = new MOTOR_ON2ON();
   MOTOR_READY2READY *motor_ready2ready = new MOTOR_READY2READY();
@@ -1608,17 +1823,16 @@ void HA_EcatCyclicThread()
   MOTOR_RESET2RESET *motor_reset2reset = new MOTOR_RESET2RESET();
   MOTOR_REGULAR_STOP2REGULAR_STOP *motor_regular_stop2regular_stop = new MOTOR_REGULAR_STOP2REGULAR_STOP();
   MOTOR_EMERGENCY_STOP2EMERGENCY_STOP *motor_emergency_stop2emergency_stop = new MOTOR_EMERGENCY_STOP2EMERGENCY_STOP();
-  
-  HA_ecatcyclic->setCondition(MOTOR_UP,             motor_up2up,              MOTOR_UP);
-  HA_ecatcyclic->setCondition(MOTOR_ON,             motor_on2on,              MOTOR_ON);
-  HA_ecatcyclic->setCondition(MOTOR_READY,          motor_ready2ready,        MOTOR_READY);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO,           motor_auto2auto,        MOTOR_AUTO);
-  HA_ecatcyclic->setCondition(MOTOR_RESET,          motor_reset2reset,        MOTOR_RESET);
-  HA_ecatcyclic->setCondition(MOTOR_REGULAR_STOP,   motor_regular_stop2regular_stop, MOTOR_REGULAR_STOP);
+
+  HA_ecatcyclic->setCondition(MOTOR_UP, motor_up2up, MOTOR_UP);
+  HA_ecatcyclic->setCondition(MOTOR_ON, motor_on2on, MOTOR_ON);
+  HA_ecatcyclic->setCondition(MOTOR_READY, motor_ready2ready, MOTOR_READY);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_auto2auto, MOTOR_AUTO);
+  HA_ecatcyclic->setCondition(MOTOR_RESET, motor_reset2reset, MOTOR_RESET);
+  HA_ecatcyclic->setCondition(MOTOR_REGULAR_STOP, motor_regular_stop2regular_stop, MOTOR_REGULAR_STOP);
   HA_ecatcyclic->setCondition(MOTOR_EMERGENCY_STOP, motor_emergency_stop2emergency_stop, MOTOR_EMERGENCY_STOP);
 
-
-//////////////////////setting conditions of state 2 state//////////////
+  //////////////////////setting conditions of state 2 state//////////////
 
   MOTOR_UP2ON *motor_up2on = new MOTOR_UP2ON();
   MOTOR_ON2READY *motor_on2ready = new MOTOR_ON2READY();
@@ -1632,21 +1846,19 @@ void HA_EcatCyclicThread()
   MOTOR_REGULAR_STOP2READY *motor_regular_stop2ready = new MOTOR_REGULAR_STOP2READY();
   MOTOR_EMERGENCY_STOP2READY *motor_emergency_stop2ready = new MOTOR_EMERGENCY_STOP2READY();
 
-  HA_ecatcyclic->setCondition(MOTOR_START,           NULL,                       MOTOR_UP);
-  HA_ecatcyclic->setCondition(MOTOR_UP,              motor_up2on,                MOTOR_ON);
-  HA_ecatcyclic->setCondition(MOTOR_ON,              motor_on2ready,             MOTOR_READY);
-  HA_ecatcyclic->setCondition(MOTOR_READY,           motor_ready2auto,           MOTOR_AUTO);
-  HA_ecatcyclic->setCondition(MOTOR_READY,           motor_ready2reset,          MOTOR_RESET);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO,            motor_auto2pid,             MOTOR_PID);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO,            motor_auto2reset,           MOTOR_RESET);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO,            motor_auto2emergency_stop,  MOTOR_EMERGENCY_STOP);
-  HA_ecatcyclic->setCondition(MOTOR_AUTO,            motor_auto2regular_stop,    MOTOR_REGULAR_STOP);
-  HA_ecatcyclic->setCondition(MOTOR_RESET,           motor_reset2ready,          MOTOR_READY);
-  HA_ecatcyclic->setCondition(MOTOR_REGULAR_STOP,    motor_regular_stop2ready,   MOTOR_READY);
-  HA_ecatcyclic->setCondition(MOTOR_PID,             NULL,                       MOTOR_AUTO);
-  HA_ecatcyclic->setCondition(MOTOR_EMERGENCY_STOP,  motor_emergency_stop2ready, MOTOR_READY);
-
-
+  HA_ecatcyclic->setCondition(MOTOR_START, NULL, MOTOR_UP);
+  HA_ecatcyclic->setCondition(MOTOR_UP, motor_up2on, MOTOR_ON);
+  HA_ecatcyclic->setCondition(MOTOR_ON, motor_on2ready, MOTOR_READY);
+  HA_ecatcyclic->setCondition(MOTOR_READY, motor_ready2auto, MOTOR_AUTO);
+  HA_ecatcyclic->setCondition(MOTOR_READY, motor_ready2reset, MOTOR_RESET);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_auto2pid, MOTOR_PID);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_auto2reset, MOTOR_RESET);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_auto2emergency_stop, MOTOR_EMERGENCY_STOP);
+  HA_ecatcyclic->setCondition(MOTOR_AUTO, motor_auto2regular_stop, MOTOR_REGULAR_STOP);
+  HA_ecatcyclic->setCondition(MOTOR_RESET, motor_reset2ready, MOTOR_READY);
+  HA_ecatcyclic->setCondition(MOTOR_REGULAR_STOP, motor_regular_stop2ready, MOTOR_READY);
+  HA_ecatcyclic->setCondition(MOTOR_PID, NULL, MOTOR_AUTO);
+  HA_ecatcyclic->setCondition(MOTOR_EMERGENCY_STOP, motor_emergency_stop2ready, MOTOR_READY);
 }
 void *cyclic_task(void *m)
 {
@@ -1680,7 +1892,7 @@ void *cyclic_task(void *m)
     HA_ecatcyclic->operate();
 
     postprocessing_ecat();
-   
+
     sprintf(log_buf, "GEAR : %d\tHANDLE : %d\tACCEL : %d\tBRAKE : %d\tVEL : %d\t\n", motor_info[GEAR_SLAVE].act_pos, motor_info[HANDLE_SLAVE].act_pos, motor_info[ACCEL_SLAVE].act_pos, motor_info[BRAKE_SLAVE].act_pos, obd2_var[OBD2_VEL].value);
     write(motor_fd, log_buf, strlen(log_buf));
   } //end of while
@@ -1784,13 +1996,13 @@ void ecat_on()
 void ecat_down()
 {
   master_info.ecat_state = ECAT_DOWN;
-  cout<<"ecat_down called" << endl;
+  cout << "ecat_down called" << endl;
   ecrt_master_deactivate(master_info.master);
 }
 void ecat_off()
 {
   master_info.ecat_state = ECAT_OFF;
-  cout<<"ecat_off called" << endl;
+  cout << "ecat_off called" << endl;
   pthread_cancel(master_info.cyclic_thread);
   pthread_join(master_info.cyclic_thread, NULL);
 }
